@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package storage;
+
+option go_package = "github.com/honnek/vigil/proto;metric";
+
+import "google/protobuf/timestamp.proto";
+import "metric.proto";
+
+
+
+message ListMetricsRequest {
+  string host = 1;
+  string name = 2;
+  google.protobuf.Timestamp from = 3;
+  google.protobuf.Timestamp to = 4;
+  int64 limit = 5;
+}
+
+message SaveSummary {
+  int64 saved = 1;
+  int64 failed = 2;
+}
+
+service StorageService {
+  rpc SaveMetrics(stream metric.Metric) returns (SaveSummary);
+  rpc ListMetrics(ListMetricsRequest) returns (stream metric.Metric);
+}
