@@ -1,0 +1,42 @@
+name: vigil
+
+services:
+  collector:
+    build:
+      context: .
+      dockerfile: services/collector/Dockerfile
+    image: vigil-collector
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+
+  agent:
+    build:
+      context: .
+      dockerfile: services/agent/Dockerfile
+    image: vigil-agent
+    depends_on:
+      - collector
+    restart: unless-stopped
+    environment:
+      - COLLECTOR_ADDR=collector:9090
+
+  postgres:
+    image: postgres:17
+    environment:
+      - POSTGRES_USER=vigil
+      - POSTGRES_PASSWORD=secret
+      - POSTGRES_DB=vigil
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vigil -d vigil"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+
+volumes:
+  pgdata:
