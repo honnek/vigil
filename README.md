@@ -117,8 +117,9 @@ go run ./services/storage/
 ## Статус
 
 - ✅ **Фаза 1 — Ядро агента:** agent (Strategy-коллекторы), collector (gRPC + валидация), docker-compose
-- 🟡 **Фаза 2 — Хранилище:** схема с партиционированием, goose-миграции, repository на pgx, gRPC-сервер storage (`SaveMetrics`/`ListMetrics`) — готовы; в работе: связка collector→storage, Redis-кэш
-- ⏳ **Фаза 3+:** Kafka (processor / alerter), API + JWT, notifier, Prometheus/OTel, anomaly detection
+- ✅ **Фаза 2 — Хранилище:** схема с партиционированием, goose-миграции, repository на pgx (CopyFrom / CollectRows / EnsurePartitions), gRPC-сервер storage (`SaveMetrics` / `ListMetrics`), связка collector→storage, Redis-кэш (write-through ZSET), весь стек в docker-compose
+- 🟡 **Фаза 3 — Обработка и алерты:** Kafka (collector → processor → alerter), агрегация, правила алертов, Circuit Breaker *(в работе)*
+- ⏳ **Фаза 4+:** API + JWT, notifier (Telegram), Prometheus/OTel, anomaly detection
 
 ---
 
