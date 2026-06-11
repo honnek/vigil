@@ -8,6 +8,11 @@ services:
     image: vigil-collector
     ports:
       - "9090:9090"
+    depends_on:
+      storage:
+        condition: service_started
+    environment:
+      - STORAGE_ADDR=storage:9091
     restart: unless-stopped
 
   agent:
@@ -20,6 +25,23 @@ services:
     restart: unless-stopped
     environment:
       - COLLECTOR_ADDR=collector:9090
+
+  storage:
+    build:
+      context: .
+      dockerfile: services/storage/Dockerfile
+    image: vigil-storage
+    ports:
+      - "9091:9091"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - POSTGRES_DSN=postgres://vigil:secret@postgres:5432/vigil?sslmode=disable
+      - REDIS_ADDR=redis:6379
+    restart: unless-stopped
 
   postgres:
     image: postgres:17
@@ -37,6 +59,16 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
 volumes:
   pgdata:
