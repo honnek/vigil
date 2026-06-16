@@ -11,8 +11,11 @@ services:
     depends_on:
       storage:
         condition: service_started
+      kafka:
+        condition: service_healthy
     environment:
       - STORAGE_ADDR=storage:9091
+      - KAFKA_ADDR=kafka:9092
     restart: unless-stopped
 
   agent:
@@ -68,6 +71,31 @@ services:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
+      retries: 5
+
+  kafka:
+    image: apache/kafka:latest
+    restart: unless-stopped
+    environment:
+      # KRaft: один узел совмещает роли брокера и контроллера (без Zookeeper)
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      # слушатели: PLAINTEXT — для клиентов, CONTROLLER — внутренний кворум
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # одиночный узел → фактор репликации служебных топиков = 1 (дефолт 3 не стартует)
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 10s
+      timeout: 5s
       retries: 5
 
 volumes:
