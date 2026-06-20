@@ -46,6 +46,18 @@ services:
       - REDIS_ADDR=redis:6379
     restart: unless-stopped
 
+  processor:
+    build:
+      context: .
+      dockerfile: services/processor/Dockerfile
+    image: vigil-processor
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      - KAFKA_ADDR=kafka:9092
+    restart: unless-stopped
+
   postgres:
     image: postgres:17
     environment:

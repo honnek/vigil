@@ -4,6 +4,11 @@
 *.so
 *.dylib
 bin/
+# собранные `go build ./services/<svc>` бинарники в корне (по имени сервиса)
+/agent
+/collector
+/processor
+/storage
 /vigil
 
 # Тесты и покрытие
@@ -27,5 +32,5 @@ go.work.sum
 .DS_Store
 Thumbs.db
 
-# Личные заметки / дизайн-док (не в публичный репозиторий)
+# Личные заметки
 Vigil.md
