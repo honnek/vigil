@@ -8,6 +8,9 @@ import (
 	"syscall"
 
 	"github.com/IBM/sarama"
+	pb "github.com/honnek/vigil/proto"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 const groupId = "vigil-processor"
@@ -18,6 +21,17 @@ func main() {
 	if kafkaAddr == "" {
 		kafkaAddr = "localhost:9092"
 	}
+	storageAddr := os.Getenv("STORAGE_ADDR")
+	if storageAddr == "" {
+		storageAddr = "localhost:9091"
+	}
+
+	conn, err := grpc.NewClient(storageAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+	storageClient := pb.NewStorageServiceClient(conn)
 
 	conf := sarama.NewConfig()
 	conf.Version = sarama.V3_6_0_0
@@ -44,7 +58,7 @@ func main() {
 		}
 	}()
 
-	h := consumerHandler{}
+	h := consumerHandler{storage: storageClient}
 	for {
 		if err := cg.Consume(ctx, []string{topic}, &h); err != nil {
 			log.Printf("Error from consumer: %v", err)

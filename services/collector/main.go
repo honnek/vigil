@@ -11,13 +11,11 @@ import (
 	"github.com/IBM/sarama"
 	pb "github.com/honnek/vigil/proto"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
 )
 
 type MetricsServer struct {
 	pb.UnimplementedMetricsServiceServer
-	storage  pb.StorageServiceClient
 	producer sarama.SyncProducer
 }
 
@@ -26,18 +24,9 @@ const topic = "metrics.raw"
 
 func (s *MetricsServer) StreamMetrics(stream pb.MetricsService_StreamMetricsServer) error {
 	var received, rejected int64
-	saveStream, err := s.storage.SaveMetrics(stream.Context())
-	if err != nil {
-		return err
-	}
-
 	for {
 		metric, err := stream.Recv()
 		if err == io.EOF {
-			_, err = saveStream.CloseAndRecv()
-			if err != nil {
-				return err
-			}
 
 			return stream.SendAndClose(&pb.StreamSummary{
 				Received: received,
@@ -54,9 +43,6 @@ func (s *MetricsServer) StreamMetrics(stream pb.MetricsService_StreamMetricsServ
 			continue
 		}
 
-		if err := saveStream.Send(metric); err != nil {
-			return err
-		}
 		data, err := proto.Marshal(metric)
 		if err != nil {
 			log.Printf("Failed to marshal metric: %s", err.Error())
@@ -93,10 +79,6 @@ func Validate(metric *pb.Metric) error {
 
 func main() {
 	server := grpc.NewServer()
-	storageAddr := os.Getenv("STORAGE_ADDR")
-	if storageAddr == "" {
-		storageAddr = "localhost:9091"
-	}
 	kafkaAddr := os.Getenv("KAFKA_ADDR")
 	if kafkaAddr == "" {
 		kafkaAddr = "localhost:9092"
@@ -107,15 +89,7 @@ func main() {
 	}
 	defer producer.Close()
 
-	conn, err := grpc.NewClient(storageAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer conn.Close()
-
-	storageClient := pb.NewStorageServiceClient(conn)
-
-	ms := MetricsServer{storage: storageClient, producer: producer}
+	ms := MetricsServer{producer: producer}
 	pb.RegisterMetricsServiceServer(server, &ms)
 	listen, err := net.Listen("tcp", port)
 	if err != nil {

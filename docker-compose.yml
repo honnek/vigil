@@ -9,12 +9,9 @@ services:
     ports:
       - "9090:9090"
     depends_on:
-      storage:
-        condition: service_started
       kafka:
         condition: service_healthy
     environment:
-      - STORAGE_ADDR=storage:9091
       - KAFKA_ADDR=kafka:9092
     restart: unless-stopped
 
@@ -54,8 +51,11 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+      storage:
+        condition: service_started
     environment:
       - KAFKA_ADDR=kafka:9092
+      - STORAGE_ADDR=storage:9091
     restart: unless-stopped
 
   postgres:
