@@ -1,10 +1,10 @@
-package main
+package kafka
 
 import (
 	"github.com/IBM/sarama"
 )
 
-func newProducer(address string) (sarama.SyncProducer, error) {
+func NewProducer(addr string) (sarama.SyncProducer, error) {
 	conf := sarama.NewConfig()
 	conf.Version = sarama.V3_6_0_0
 
@@ -14,7 +14,7 @@ func newProducer(address string) (sarama.SyncProducer, error) {
 	conf.Producer.Retry.Max = 5
 	conf.Net.MaxOpenRequests = 1
 
-	producer, err := sarama.NewSyncProducer([]string{address}, conf)
+	producer, err := sarama.NewSyncProducer([]string{addr}, conf)
 	if err != nil {
 		return nil, err
 	}
@@ -22,9 +22,9 @@ func newProducer(address string) (sarama.SyncProducer, error) {
 	return producer, nil
 }
 
-func publishMetric(metric []byte, producer sarama.SyncProducer, topic, host string) error {
-	msg := &sarama.ProducerMessage{Topic: topic, Key: sarama.StringEncoder(host), Value: sarama.ByteEncoder(metric)}
-	_, _, err := producer.SendMessage(msg)
+func PublishMetric(p sarama.SyncProducer, topic, host string, value []byte) error {
+	msg := &sarama.ProducerMessage{Topic: topic, Key: sarama.StringEncoder(host), Value: sarama.ByteEncoder(value)}
+	_, _, err := p.SendMessage(msg)
 	if err != nil {
 		return err
 	}

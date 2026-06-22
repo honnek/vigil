@@ -6,32 +6,24 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/honnek/vigil/pkg/kafka"
-	pb "github.com/honnek/vigil/proto"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"github.com/redis/go-redis/v9"
 )
 
-const groupId = "vigil-processor"
-const topic = "metrics.raw"
+const consumeTopic = "metrics.raw"
+const groupId = "vigil-alerter"
 
 func main() {
 	kafkaAddr := os.Getenv("KAFKA_ADDR")
 	if kafkaAddr == "" {
 		kafkaAddr = "localhost:9092"
 	}
-	storageAddr := os.Getenv("STORAGE_ADDR")
-	if storageAddr == "" {
-		storageAddr = "localhost:9091"
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "localhost:6379"
 	}
-
-	conn, err := grpc.NewClient(storageAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer conn.Close()
-	storageClient := pb.NewStorageServiceClient(conn)
 
 	cg, err := kafka.NewConsumerGroup(kafkaAddr, groupId)
 	if err != nil {
@@ -41,6 +33,12 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	redisClient := redis.NewClient(&redis.Options{Addr: redisAddr})
+	defer redisClient.Close()
+	if err := redisClient.Ping(ctx).Err(); err != nil {
+		log.Fatal(err)
+	}
 
 	go func() {
 		for {
@@ -53,9 +51,15 @@ func main() {
 		}
 	}()
 
-	h := consumerHandler{storage: storageClient}
+	producer, err := kafka.NewProducer(kafkaAddr)
+	if err != nil {
+		log.Fatalf("Error creating producer: %v", err)
+	}
+	defer producer.Close()
+
+	h := alerterHandler{rdb: redisClient, producer: producer, dedupTTL: 90 * time.Second, renotifyTTL: time.Minute}
 	for {
-		if err := cg.Consume(ctx, []string{topic}, &h); err != nil {
+		if err := cg.Consume(ctx, []string{consumeTopic}, &h); err != nil {
 			log.Printf("Error from consumer: %v", err)
 		}
 		if ctx.Err() != nil {

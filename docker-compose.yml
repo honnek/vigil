@@ -58,6 +58,21 @@ services:
       - STORAGE_ADDR=storage:9091
     restart: unless-stopped
 
+  alerter:
+    build:
+      context: .
+      dockerfile: services/alerter/Dockerfile
+    image: vigil-alerter
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - KAFKA_ADDR=kafka:9092
+      - REDIS_ADDR=redis:6379
+    restart: unless-stopped
+
   postgres:
     image: postgres:17
     environment:

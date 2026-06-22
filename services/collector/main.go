@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/IBM/sarama"
+	"github.com/honnek/vigil/pkg/kafka"
 	pb "github.com/honnek/vigil/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
@@ -48,7 +49,7 @@ func (s *MetricsServer) StreamMetrics(stream pb.MetricsService_StreamMetricsServ
 			log.Printf("Failed to marshal metric: %s", err.Error())
 			continue
 		}
-		err = publishMetric(data, s.producer, topic, metric.GetHost())
+		err = kafka.PublishMetric(s.producer, topic, metric.GetHost(), data)
 		if err != nil {
 			log.Printf("Failed to publish metric: %s", err.Error())
 		}
@@ -83,7 +84,7 @@ func main() {
 	if kafkaAddr == "" {
 		kafkaAddr = "localhost:9092"
 	}
-	producer, err := newProducer(kafkaAddr)
+	producer, err := kafka.NewProducer(kafkaAddr)
 	if err != nil {
 		log.Fatal(err)
 	}

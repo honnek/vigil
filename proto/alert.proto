@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package alert;
+
+option go_package = "github.com/honnek/vigil/proto;metric";
+
+import "google/protobuf/timestamp.proto";
+
+
+enum AlertState {
+  ALERT_STATE_UNSPECIFIED = 0;
+  ALERT_STATE_FIRING = 1;
+  ALERT_STATE_RESOLVED = 2;
+}
+
+message Alert {
+  string host = 1;
+  string rule = 2;
+  string metric = 3;
+  double value = 4;
+  double threshold = 5;
+  AlertState state = 6;
+  google.protobuf.Timestamp timestamp = 7;
+}
