@@ -6,7 +6,9 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
+	"github.com/honnek/vigil/pkg/circuitbreaker"
 	"github.com/honnek/vigil/pkg/kafka"
 	pb "github.com/honnek/vigil/proto"
 	"google.golang.org/grpc"
@@ -53,7 +55,7 @@ func main() {
 		}
 	}()
 
-	h := consumerHandler{storage: storageClient}
+	h := consumerHandler{storage: storageClient, cb: circuitbreaker.NewCircuitBreaker(5, 10*time.Second, 5)}
 	for {
 		if err := cg.Consume(ctx, []string{topic}, &h); err != nil {
 			log.Printf("Error from consumer: %v", err)

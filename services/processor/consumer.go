@@ -1,15 +1,19 @@
 package main
 
 import (
+	"errors"
 	"log"
+	"time"
 
 	"github.com/IBM/sarama"
+	"github.com/honnek/vigil/pkg/circuitbreaker"
 	pb "github.com/honnek/vigil/proto"
 	"google.golang.org/protobuf/proto"
 )
 
 type consumerHandler struct {
 	storage pb.StorageServiceClient
+	cb      *circuitbreaker.CircuitBreaker
 }
 
 const batchSize = 500
@@ -60,25 +64,36 @@ func (h *consumerHandler) flush(sess sarama.ConsumerGroupSession, buf []*pb.Metr
 		return nil
 	}
 
-	saveStream, err := h.storage.SaveMetrics(sess.Context())
-	if err != nil {
-		return err
-	}
-	for _, m := range buf {
-		err = saveStream.Send(m)
+	err := h.cb.Execute(func() error {
+		saveStream, err := h.storage.SaveMetrics(sess.Context())
 		if err != nil {
 			return err
 		}
-	}
+		for _, m := range buf {
+			err = saveStream.Send(m)
+			if err != nil {
+				return err
+			}
+		}
 
-	_, err = saveStream.CloseAndRecv()
+		_, err = saveStream.CloseAndRecv()
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
 	if err != nil {
+		if errors.Is(err, circuitbreaker.ErrorOpen) {
+			time.Sleep(5 * time.Second)
+		}
 		return err
+
 	}
 
 	for _, m := range bufMsgs {
 		sess.MarkMessage(m, "")
 	}
-
 	return nil
 }
