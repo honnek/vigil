@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"time"
@@ -38,6 +39,9 @@ func (h *alerterHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sa
 		}
 
 		for _, r := range Evaluate(&m) {
+			if h.isSilenced(sess.Context(), m.GetHost(), r.Name) {
+				continue
+			}
 			var alKey, rKey = alertKey(m.GetHost(), r.Name), renotifyKey(m.GetHost(), r.Name)
 			isNewAlert, err := h.rdb.SetNX(sess.Context(), alKey, m.GetValue(), h.dedupTTL).Result()
 			if err != nil {
@@ -70,6 +74,18 @@ func (h *alerterHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sa
 	}
 
 	return nil
+}
+
+func (h *alerterHandler) isSilenced(ctx context.Context, host string, name string) bool {
+	n, _ := h.rdb.Exists(ctx, SilenceKey(host, name), SilenceKey(host, "*")).Result()
+	if n > 0 {
+		return true
+	}
+	return false
+}
+
+func SilenceKey(host, rule string) string {
+	return fmt.Sprintf("silence:%s:%s", host, rule)
 }
 
 func alertKey(host, name string) string {
