@@ -13,6 +13,7 @@ import (
 
 type consumerHandler struct {
 	storage pb.StorageServiceClient
+	agg     *Pool
 	cb      *circuitbreaker.CircuitBreaker
 }
 
@@ -40,6 +41,8 @@ func (h *consumerHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim s
 
 		buf = append(buf, &m)
 		bufMsgs = append(bufMsgs, msg)
+
+		h.agg.submit(&m)
 
 		if len(buf) >= batchSize {
 			if err := h.flush(sess, buf, bufMsgs); err != nil {

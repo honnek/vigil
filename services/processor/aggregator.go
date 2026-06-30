@@ -32,7 +32,7 @@ type worker struct {
 	ticker     *time.Ticker
 }
 
-type pool struct {
+type Pool struct {
 	workers []*worker
 	n       int
 }
@@ -41,7 +41,7 @@ func newWindow(size int) *window {
 	return &window{buf: make([]float64, size), pos: 0, full: false}
 }
 
-func newPool(n, windowSize int, flushInterval time.Duration, storage pb.StorageServiceClient, ctx context.Context) *pool {
+func NewPool(n, windowSize int, flushInterval time.Duration, storage pb.StorageServiceClient, ctx context.Context) *Pool {
 	workers := make([]*worker, n)
 
 	for i := 0; i < n; i++ {
@@ -57,10 +57,10 @@ func newPool(n, windowSize int, flushInterval time.Duration, storage pb.StorageS
 		workers[i] = w
 	}
 
-	return &pool{workers: workers, n: n}
+	return &Pool{workers: workers, n: n}
 }
 
-func (p *pool) submit(m *pb.Metric) {
+func (p *Pool) submit(m *pb.Metric) {
 	idx := hashHost(m.GetHost()) % p.n
 
 	select {

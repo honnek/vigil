@@ -55,7 +55,9 @@ func main() {
 		}
 	}()
 
-	h := consumerHandler{storage: storageClient, cb: circuitbreaker.NewCircuitBreaker(5, 10*time.Second, 5)}
+	agg := NewPool(5, 60, time.Minute, storageClient, ctx)
+	cb := circuitbreaker.NewCircuitBreaker(5, 10*time.Second, 5)
+	h := consumerHandler{storage: storageClient, agg: agg, cb: cb}
 	for {
 		if err := cg.Consume(ctx, []string{topic}, &h); err != nil {
 			log.Printf("Error from consumer: %v", err)
