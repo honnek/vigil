@@ -60,10 +60,10 @@
 | Сервис            | Порт  | Роль                                                       |
 | ----------------- | ----- | ---------------------------------------------------------- |
 | `vigil-agent`     | —     | Сбор метрик хоста (CPU, RAM, диск) через Strategy → gRPC   |
-| `vigil-collector` | :9090 | Приём gRPC-потоков, валидация, форвард в storage           |
+| `vigil-collector` | :9090 | Приём gRPC-потоков, валидация, publish в Kafka              |
 | `vigil-storage`   | :9091 | gRPC API записи/чтения метрик, PostgreSQL + Redis          |
-| `vigil-processor` | —     | Consume из Kafka, агрегация, скользящие средние *(планы)*  |
-| `vigil-alerter`   | —     | Оценка правил, дедупликация, silence *(планы)*             |
+| `vigil-processor` | —     | Consume из Kafka, батч → storage, агрегация (скользящие средние) |
+| `vigil-alerter`   | —     | Оценка правил, дедупликация + renotify, silence            |
 | `vigil-notifier`  | —     | Доставка алертов: Telegram / webhook *(планы)*             |
 | `vigil-api`       | :8080 | REST Gateway, JWT, swagger *(планы)*                       |
 
@@ -76,10 +76,15 @@ vigil/
 ├── proto/                  # protobuf-схемы и сгенерированный код
 ├── services/
 │   ├── agent/              # сбор метрик (Strategy: CPU/RAM/Disk)
-│   ├── collector/          # gRPC-сервер приёма + валидация
+│   ├── collector/          # gRPC-сервер приёма + валидация + publish в Kafka
+│   ├── processor/          # consume Kafka → storage, агрегация (worker pool)
+│   ├── alerter/            # правила, дедуп/renotify, silence → топик alerts
 │   └── storage/            # gRPC + PostgreSQL (миграции, repository)
 │       ├── migrations/     # goose SQL-миграции
 │       └── repository/     # pgx: SaveBatch / List / EnsurePartitions
+├── pkg/
+│   ├── kafka/              # продюсер + consumer group (sarama)
+│   └── circuitbreaker/     # машина состояний Closed/Open/HalfOpen
 ├── docker-compose.yml
 └── Makefile
 ```
@@ -91,15 +96,15 @@ vigil/
 Требования: Go 1.25+, Docker, `protoc` (для регенерации proto).
 
 ```bash
-# поднять инфраструктуру (collector + agent + postgres)
+# поднять весь стек (agent, collector, kafka, processor, alerter, storage, postgres, redis)
 make up
+```
 
-# установить и накатить миграции БД
+Миграции БД storage накатывает сам при старте (goose, embed). Для ручного прогона:
+
+```bash
 make migrate-install
 make migrate
-
-# запустить storage локально
-go run ./services/storage/
 ```
 
 Полезные make-таргеты:
