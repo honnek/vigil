@@ -11,6 +11,7 @@ bin/
 /storage
 /vigil
 /alerter
+/notifier
 
 # Тесты и покрытие
 *.test

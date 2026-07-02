@@ -73,6 +73,20 @@ services:
       - REDIS_ADDR=redis:6379
     restart: unless-stopped
 
+  notifier:
+    build:
+      context: .
+      dockerfile: services/notifier/Dockerfile
+    image: vigil-notifier
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      - KAFKA_ADDR=kafka:9092
+    env_file:
+      - .env
+    restart: unless-stopped
+
   postgres:
     image: postgres:17
     environment:
