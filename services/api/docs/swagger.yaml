@@ -1,0 +1,146 @@
+basePath: /
+definitions:
+  main.AlertDTO:
+    properties:
+      host:
+        type: string
+      rule:
+        type: string
+    type: object
+  main.MetricDTO:
+    properties:
+      host:
+        type: string
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      name:
+        type: string
+      ts:
+        type: string
+      value:
+        type: number
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: 'REST-фасад Vigil: метрики из storage и текущие алерты. Защищено JWT.'
+  title: Vigil API
+  version: "1.0"
+paths:
+  /alerts:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/main.AlertDTO'
+            type: array
+        "401":
+          description: нет/невалидный токен
+          schema:
+            type: string
+        "500":
+          description: ошибка redis
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Текущие горящие алерты
+      tags:
+      - alerts
+  /login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: логин и пароль
+        in: body
+        name: credentials
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: поле signed — JWT-токен
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: неверное тело запроса
+          schema:
+            type: string
+        "401":
+          description: неверные учётные данные
+          schema:
+            type: string
+      summary: Логин, выдаёт JWT-токен
+      tags:
+      - auth
+  /metrics:
+    get:
+      parameters:
+      - description: хост
+        in: query
+        name: host
+        required: true
+        type: string
+      - description: имя метрики (напр. cpu_usage_percent)
+        in: query
+        name: name
+        required: true
+        type: string
+      - description: начало периода, RFC3339
+        in: query
+        name: from
+        required: true
+        type: string
+      - description: конец периода, RFC3339
+        in: query
+        name: to
+        required: true
+        type: string
+      - description: макс. число точек
+        in: query
+        name: limit
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/main.MetricDTO'
+            type: array
+        "400":
+          description: неверные параметры
+          schema:
+            type: string
+        "401":
+          description: нет/невалидный токен
+          schema:
+            type: string
+        "500":
+          description: ошибка storage
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Список метрик за период
+      tags:
+      - metrics
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

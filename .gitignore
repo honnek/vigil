@@ -12,6 +12,7 @@ bin/
 /vigil
 /alerter
 /notifier
+/api
 
 # Тесты и покрытие
 *.test

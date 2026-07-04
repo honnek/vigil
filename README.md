@@ -64,8 +64,8 @@
 | `vigil-storage`   | :9091 | gRPC API записи/чтения метрик, PostgreSQL + Redis          |
 | `vigil-processor` | —     | Consume из Kafka, батч → storage, агрегация (скользящие средние) |
 | `vigil-alerter`   | —     | Оценка правил, дедупликация + renotify, silence            |
-| `vigil-notifier`  | —     | Доставка алертов: Telegram / webhook *(планы)*             |
-| `vigil-api`       | :8080 | REST Gateway, JWT, swagger *(планы)*                       |
+| `vigil-notifier`  | —     | Доставка алертов в Telegram (консьюмер alerts + retry)     |
+| `vigil-api`       | :8080 | REST Gateway (chi), JWT, /metrics, /alerts, swagger        |
 
 ---
 

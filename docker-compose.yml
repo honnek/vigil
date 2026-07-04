@@ -87,6 +87,26 @@ services:
       - .env
     restart: unless-stopped
 
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    image: vigil-api
+    ports:
+      - "8080:8080"
+    depends_on:
+      storage:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    environment:
+      - STORAGE_ADDR=storage:9091
+      - API_ADDR=:8080
+      - REDIS_ADDR=redis:6379
+    env_file:
+      - .env
+    restart: unless-stopped
+
   postgres:
     image: postgres:17
     environment:
