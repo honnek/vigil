@@ -71,6 +71,8 @@ func (s *StorageService) SaveMetrics(stream pb.StorageService_SaveMetricsServer)
 			return err
 		}
 
+		metricsSizeBatch.Observe(float64(len(buf)))
+		metricsSaved.Add(float64(len(buf)))
 		saved += len(buf)
 		buf = buf[:0]
 		return nil

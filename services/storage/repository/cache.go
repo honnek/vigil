@@ -8,12 +8,24 @@ import (
 	"time"
 
 	pb "github.com/honnek/vigil/proto"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/protobuf/proto"
 )
 
 var _ MetricRepository = (*CachingRepository)(nil)
 var _ MetricRepository = (*PgMetricRepository)(nil)
+var (
+	metricsRedisReceived = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "vigil_storage_metrics_received_total",
+		Help: "Количество полученых редисом метрик",
+	})
+	metricsRedisRejected = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "vigil_storage_metrics_rejected_total",
+		Help: "Количество отклоненных редисом метрик",
+	})
+)
 
 type CachingRepository struct {
 	next      MetricRepository
@@ -88,6 +100,7 @@ func (r *CachingRepository) listFromCache(ctx context.Context, f MetricFilter) (
 		Count:   int64(f.Limit),
 	}).Result()
 	if err != nil {
+		metricsRedisRejected.Inc()
 		return nil, err
 	}
 
@@ -95,10 +108,12 @@ func (r *CachingRepository) listFromCache(ctx context.Context, f MetricFilter) (
 	for _, member := range members {
 		var m pb.Metric
 		if err := proto.Unmarshal([]byte(member), &m); err != nil {
+			metricsRedisRejected.Inc()
 			return nil, err
 		}
 		metrics = append(metrics, &m)
 	}
 
+	metricsRedisReceived.Add(float64(len(members)))
 	return metrics, nil
 }

@@ -9,8 +9,12 @@ import (
 	"os"
 
 	"github.com/IBM/sarama"
+	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/honnek/vigil/pkg/kafka"
+	"github.com/honnek/vigil/pkg/metrics"
 	pb "github.com/honnek/vigil/proto"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 )
@@ -22,6 +26,17 @@ type MetricsServer struct {
 
 const port = ":9090"
 const topic = "metrics.raw"
+
+var (
+	metricsReceived = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "vigil_collector_metrics_received_total",
+		Help: "Количество принятых и опубликованных метрик",
+	})
+	metricsRejected = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "vigil_collector_metrics_rejected_total",
+		Help: "Количество отклонённых метрик по причине",
+	}, []string{"reason"})
+)
 
 func (s *MetricsServer) StreamMetrics(stream pb.MetricsService_StreamMetricsServer) error {
 	var received, rejected int64
@@ -39,6 +54,7 @@ func (s *MetricsServer) StreamMetrics(stream pb.MetricsService_StreamMetricsServ
 		}
 
 		if err := Validate(metric); err != nil {
+			metricsRejected.WithLabelValues("validate").Inc()
 			log.Printf("Rejected on validation: %s", err.Error())
 			rejected++
 			continue
@@ -46,14 +62,20 @@ func (s *MetricsServer) StreamMetrics(stream pb.MetricsService_StreamMetricsServ
 
 		data, err := proto.Marshal(metric)
 		if err != nil {
+			metricsRejected.WithLabelValues("marshal").Inc()
 			log.Printf("Failed to marshal metric: %s", err.Error())
+			rejected++
 			continue
 		}
 		err = kafka.PublishMetric(s.producer, topic, metric.GetHost(), data)
 		if err != nil {
+			metricsRejected.WithLabelValues("publish").Inc()
 			log.Printf("Failed to publish metric: %s", err.Error())
+			rejected++
+			continue
 		}
 
+		metricsReceived.Inc()
 		received++
 	}
 }
@@ -79,7 +101,17 @@ func Validate(metric *pb.Metric) error {
 }
 
 func main() {
-	server := grpc.NewServer()
+	srvMetrics := grpcprom.NewServerMetrics()
+	prometheus.MustRegister(srvMetrics)
+	server := grpc.NewServer(
+		grpc.ChainStreamInterceptor(srvMetrics.StreamServerInterceptor()),
+		grpc.ChainUnaryInterceptor(srvMetrics.UnaryServerInterceptor()),
+	)
+	metricsAddr := os.Getenv("METRICS_ADDR")
+	if metricsAddr == "" {
+		metricsAddr = ":2112"
+	}
+
 	kafkaAddr := os.Getenv("KAFKA_ADDR")
 	if kafkaAddr == "" {
 		kafkaAddr = "localhost:9092"
@@ -99,6 +131,7 @@ func main() {
 	}
 
 	fmt.Println("Serving requests...")
+	metrics.Serve(metricsAddr)
 	err = server.Serve(listen)
 	if err != nil {
 		log.Fatal(err)
