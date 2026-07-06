@@ -32,9 +32,11 @@ func (h *consumerHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim s
 	bufMsgs := make([]*sarama.ConsumerMessage, 0, batchSize)
 	for msg := range claim.Messages() {
 		var m pb.Metric
+		consumedMessages.Inc()
 		err := proto.Unmarshal(msg.Value, &m)
 		if err != nil {
 			log.Printf("Error unmarshaling message: %s\n", err)
+			errorsMessages.WithLabelValues("decode").Inc()
 			sess.MarkMessage(msg, "")
 			continue
 		}
@@ -66,6 +68,7 @@ func (h *consumerHandler) flush(sess sarama.ConsumerGroupSession, buf []*pb.Metr
 	if len(buf) == 0 {
 		return nil
 	}
+	start := time.Now()
 
 	err := h.cb.Execute(func() error {
 		saveStream, err := h.storage.SaveMetrics(sess.Context())
@@ -91,9 +94,12 @@ func (h *consumerHandler) flush(sess sarama.ConsumerGroupSession, buf []*pb.Metr
 		if errors.Is(err, circuitbreaker.ErrorOpen) {
 			time.Sleep(5 * time.Second)
 		}
+		errorsMessages.WithLabelValues("execute").Inc()
 		return err
 
 	}
+
+	flushDuration.Observe(time.Since(start).Seconds())
 
 	for _, m := range bufMsgs {
 		sess.MarkMessage(m, "")

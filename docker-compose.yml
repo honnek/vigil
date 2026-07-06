@@ -52,6 +52,8 @@ services:
       context: .
       dockerfile: services/processor/Dockerfile
     image: vigil-processor
+    ports:
+      - "2115:2112"
     depends_on:
       kafka:
         condition: service_healthy
@@ -60,6 +62,7 @@ services:
     environment:
       - KAFKA_ADDR=kafka:9092
       - STORAGE_ADDR=storage:9091
+      - METRICS_ADDR=:2112
     restart: unless-stopped
 
   alerter:
@@ -67,6 +70,8 @@ services:
       context: .
       dockerfile: services/alerter/Dockerfile
     image: vigil-alerter
+    ports:
+      - "2116:2112"
     depends_on:
       kafka:
         condition: service_healthy
@@ -75,6 +80,7 @@ services:
     environment:
       - KAFKA_ADDR=kafka:9092
       - REDIS_ADDR=redis:6379
+      - METRICS_ADDR=:2112
     restart: unless-stopped
 
   notifier:
@@ -82,11 +88,14 @@ services:
       context: .
       dockerfile: services/notifier/Dockerfile
     image: vigil-notifier
+    ports:
+      - "2117:2112"
     depends_on:
       kafka:
         condition: service_healthy
     environment:
       - KAFKA_ADDR=kafka:9092
+      - METRICS_ADDR=:2112
     env_file:
       - .env
     restart: unless-stopped
@@ -98,6 +107,7 @@ services:
     image: vigil-api
     ports:
       - "8080:8080"
+      - "2114:2112"
     depends_on:
       storage:
         condition: service_started
@@ -107,6 +117,7 @@ services:
       - STORAGE_ADDR=storage:9091
       - API_ADDR=:8080
       - REDIS_ADDR=redis:6379
+      - METRICS_ADDR=:2112
     env_file:
       - .env
     restart: unless-stopped

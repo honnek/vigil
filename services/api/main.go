@@ -6,17 +6,32 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/honnek/vigil/pkg/metrics"
 	pb "github.com/honnek/vigil/proto"
 	_ "github.com/honnek/vigil/services/api/docs"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/redis/go-redis/v9"
 	httpSwagger "github.com/swaggo/http-swagger"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+)
+
+var (
+	httpRequests = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "vigil_api_http_requests_total",
+		Help: "Количество принятых запросов",
+	}, []string{"method", "route", "status"})
+	httpDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name: "vigil_api_http_request_duration_seconds",
+		Help: "задержка",
+	}, []string{"method", "route"})
 )
 
 // @title       Vigil API
@@ -52,6 +67,10 @@ func main() {
 	if redisAddr == "" {
 		redisAddr = "localhost:6379"
 	}
+	prometheusAddr := os.Getenv("METRICS_ADDR")
+	if prometheusAddr == "" {
+		prometheusAddr = ":2112"
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -77,7 +96,7 @@ func main() {
 	}
 
 	r := chi.NewRouter()
-	r.Use(middleware.Logger, middleware.Recoverer)
+	r.Use(middleware.Logger, middleware.Recoverer, prometheusMiddleware)
 
 	r.Get("/swagger/*", httpSwagger.WrapHandler)
 
@@ -104,10 +123,28 @@ func main() {
 
 	log.Printf("Listening on %s", apiAddr)
 
+	metrics.Serve(prometheusAddr)
+
 	<-ctx.Done()
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
 	server.Shutdown(shutdownCtx)
+}
+
+func prometheusMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+
+		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+		next.ServeHTTP(ww, r)
+
+		duration := time.Since(start).Seconds()
+		route := chi.RouteContext(r.Context()).RoutePattern()
+		status := strconv.Itoa(ww.Status())
+
+		httpDuration.WithLabelValues(r.Method, route).Observe(duration)
+		httpRequests.WithLabelValues(r.Method, route, status).Inc()
+	})
 }

@@ -14,3 +14,20 @@ scrape_configs:
   - job_name: vigil-storage
     static_configs:
       - targets: ["storage:2112"]
+
+  - job_name: vigil-api
+    static_configs:
+      - targets: [ "api:2112"]
+
+  - job_name: vigil-processor
+    static_configs:
+      - targets: [ "processor:2112" ]
+
+  - job_name: vigil-alerter
+    static_configs:
+      - targets: [ "alerter:2112" ]
+
+  - job_name: vigil-notifier
+    static_configs:
+      - targets: [ "notifier:2112" ]
+

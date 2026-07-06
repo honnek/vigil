@@ -10,9 +10,27 @@ import (
 
 	"github.com/honnek/vigil/pkg/circuitbreaker"
 	"github.com/honnek/vigil/pkg/kafka"
+	"github.com/honnek/vigil/pkg/metrics"
 	pb "github.com/honnek/vigil/proto"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+)
+
+var (
+	consumedMessages = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "vigil_processor_messages_consumed_total",
+		Help: "Число обработанных сообщений",
+	})
+	errorsMessages = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "vigil_processor_errors_total",
+		Help: "Число ошибок",
+	}, []string{"stage"})
+	flushDuration = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name: "vigil_processor_flush_duration_seconds",
+		Help: "Задержка flush",
+	})
 )
 
 const groupId = "vigil-processor"
@@ -26,6 +44,10 @@ func main() {
 	storageAddr := os.Getenv("STORAGE_ADDR")
 	if storageAddr == "" {
 		storageAddr = "localhost:9091"
+	}
+	prometheusMetricsAddr := os.Getenv("METRICS_ADDR")
+	if prometheusMetricsAddr == "" {
+		prometheusMetricsAddr = ":2112"
 	}
 
 	conn, err := grpc.NewClient(storageAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -54,6 +76,8 @@ func main() {
 			}
 		}
 	}()
+
+	metrics.Serve(prometheusMetricsAddr)
 
 	agg := NewPool(5, 60, time.Minute, storageClient, ctx)
 	cb := circuitbreaker.NewCircuitBreaker(5, 10*time.Second, 5)

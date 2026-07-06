@@ -32,9 +32,11 @@ func (h *alerterHandler) Cleanup(sess sarama.ConsumerGroupSession) error {
 func (h *alerterHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	for msg := range claim.Messages() {
 		var m pb.Metric
+		consumedMessages.Inc()
 		err := proto.Unmarshal(msg.Value, &m)
 		if err != nil {
 			log.Printf("Error unmarshaling message: %s\n", err)
+			errorsMessages.WithLabelValues("decode").Inc()
 			continue
 		}
 
@@ -51,21 +53,26 @@ func (h *alerterHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sa
 			pubMsg, _ := proto.Marshal(proto.Message(&a))
 
 			if isNewAlert {
+				start := time.Now()
 				_, _, err = h.producer.SendMessage(&sarama.ProducerMessage{Topic: pubTopic, Key: sarama.StringEncoder(m.GetHost()), Value: sarama.ByteEncoder(pubMsg)})
 				if err != nil {
 					log.Printf("Error sending message: %s\n", err)
+					errorsMessages.WithLabelValues("send").Inc()
 				}
 				h.rdb.Set(sess.Context(), rKey, "1", h.renotifyTTL)
+				flushDuration.Observe(time.Since(start).Seconds())
 			} else {
 				h.rdb.Expire(sess.Context(), alKey, h.dedupTTL)
 				shouldRenotify, err := h.rdb.SetNX(sess.Context(), rKey, m.GetValue(), h.renotifyTTL).Result()
 				if err != nil {
 					log.Printf("Error setting key: %s\n", err)
+					errorsMessages.WithLabelValues("setting").Inc()
 				}
 				if shouldRenotify {
 					_, _, err = h.producer.SendMessage(&sarama.ProducerMessage{Topic: pubTopic, Key: sarama.StringEncoder(m.GetHost()), Value: sarama.ByteEncoder(pubMsg)})
 					if err != nil {
 						log.Printf("Error sending message: %s\n", err)
+						errorsMessages.WithLabelValues("send").Inc()
 					}
 				}
 			}
