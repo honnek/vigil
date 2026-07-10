@@ -12,9 +12,12 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+      jaeger:
+        condition: service_started
     environment:
       - KAFKA_ADDR=kafka:9092
       - METRICS_ADDR=:2112
+      - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4317
     restart: unless-stopped
 
   agent:
@@ -22,11 +25,14 @@ services:
       context: .
       dockerfile: services/agent/Dockerfile
     image: vigil-agent
+    hostname: honnek-G5-GE
     depends_on:
       - collector
+      - jaeger
     restart: unless-stopped
     environment:
       - COLLECTOR_ADDR=collector:9090
+      - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4317
 
   storage:
     build:
@@ -41,10 +47,13 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      jaeger:
+        condition: service_started
     environment:
       - POSTGRES_DSN=postgres://vigil:secret@postgres:5432/vigil?sslmode=disable
       - REDIS_ADDR=redis:6379
       - METRICS_ADDR=:2112
+      - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4317
     restart: unless-stopped
 
   processor:
@@ -59,10 +68,13 @@ services:
         condition: service_healthy
       storage:
         condition: service_started
+      jaeger:
+        condition: service_started
     environment:
       - KAFKA_ADDR=kafka:9092
       - STORAGE_ADDR=storage:9091
       - METRICS_ADDR=:2112
+      - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4317
     restart: unless-stopped
 
   alerter:

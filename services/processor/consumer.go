@@ -7,7 +7,10 @@ import (
 
 	"github.com/IBM/sarama"
 	"github.com/honnek/vigil/pkg/circuitbreaker"
+	"github.com/honnek/vigil/pkg/kafka"
 	pb "github.com/honnek/vigil/proto"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -33,10 +36,16 @@ func (h *consumerHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim s
 	for msg := range claim.Messages() {
 		var m pb.Metric
 		consumedMessages.Inc()
+
+		ctx := otel.GetTextMapPropagator().Extract(sess.Context(), kafka.NewConsumerCarrier(msg))
+		tracer := otel.Tracer("vigil-processor")
+		ctx, span := tracer.Start(ctx, "process metric", trace.WithSpanKind(trace.SpanKindConsumer))
+
 		err := proto.Unmarshal(msg.Value, &m)
 		if err != nil {
 			log.Printf("Error unmarshaling message: %s\n", err)
 			errorsMessages.WithLabelValues("decode").Inc()
+			span.End()
 			sess.MarkMessage(msg, "")
 			continue
 		}
@@ -55,6 +64,7 @@ func (h *consumerHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim s
 			buf = buf[:0]
 		}
 
+		span.End()
 	}
 
 	if err := h.flush(sess, buf, bufMsgs); err != nil {

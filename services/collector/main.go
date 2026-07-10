@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -12,9 +13,11 @@ import (
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/honnek/vigil/pkg/kafka"
 	"github.com/honnek/vigil/pkg/metrics"
+	"github.com/honnek/vigil/pkg/tracing"
 	pb "github.com/honnek/vigil/proto"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 )
@@ -67,7 +70,7 @@ func (s *MetricsServer) StreamMetrics(stream pb.MetricsService_StreamMetricsServ
 			rejected++
 			continue
 		}
-		err = kafka.PublishMetric(s.producer, topic, metric.GetHost(), data)
+		err = kafka.PublishMetric(stream.Context(), s.producer, topic, metric.GetHost(), data)
 		if err != nil {
 			metricsRejected.WithLabelValues("publish").Inc()
 			log.Printf("Failed to publish metric: %s", err.Error())
@@ -106,11 +109,22 @@ func main() {
 	server := grpc.NewServer(
 		grpc.ChainStreamInterceptor(srvMetrics.StreamServerInterceptor()),
 		grpc.ChainUnaryInterceptor(srvMetrics.UnaryServerInterceptor()),
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 	)
 	metricsAddr := os.Getenv("METRICS_ADDR")
 	if metricsAddr == "" {
 		metricsAddr = ":2112"
 	}
+
+	otelAddr := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if otelAddr == "" {
+		otelAddr = "localhost:4317"
+	}
+	shutdown, err := tracing.Init(context.Background(), "vigil-collector", otelAddr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer shutdown(context.Background())
 
 	kafkaAddr := os.Getenv("KAFKA_ADDR")
 	if kafkaAddr == "" {

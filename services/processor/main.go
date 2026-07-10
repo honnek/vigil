@@ -11,6 +11,7 @@ import (
 	"github.com/honnek/vigil/pkg/circuitbreaker"
 	"github.com/honnek/vigil/pkg/kafka"
 	"github.com/honnek/vigil/pkg/metrics"
+	"github.com/honnek/vigil/pkg/tracing"
 	pb "github.com/honnek/vigil/proto"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -50,6 +51,19 @@ func main() {
 		prometheusMetricsAddr = ":2112"
 	}
 
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	otelAddr := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if otelAddr == "" {
+		otelAddr = "localhost:4317"
+	}
+	shutdown, err := tracing.Init(ctx, "vigil-processor", otelAddr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer shutdown(context.Background())
+
 	conn, err := grpc.NewClient(storageAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal(err)
@@ -62,9 +76,6 @@ func main() {
 		log.Fatalf("Error creating consumer group client: %v", err)
 	}
 	defer cg.Close()
-
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
 
 	go func() {
 		for {

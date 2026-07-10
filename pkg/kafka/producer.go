@@ -1,7 +1,10 @@
 package kafka
 
 import (
+	"context"
+
 	"github.com/IBM/sarama"
+	"go.opentelemetry.io/otel"
 )
 
 func NewProducer(addr string) (sarama.SyncProducer, error) {
@@ -22,8 +25,9 @@ func NewProducer(addr string) (sarama.SyncProducer, error) {
 	return producer, nil
 }
 
-func PublishMetric(p sarama.SyncProducer, topic, host string, value []byte) error {
+func PublishMetric(ctx context.Context, p sarama.SyncProducer, topic, host string, value []byte) error {
 	msg := &sarama.ProducerMessage{Topic: topic, Key: sarama.StringEncoder(host), Value: sarama.ByteEncoder(value)}
+	otel.GetTextMapPropagator().Inject(ctx, &ProducerCarrier{msg: msg})
 	_, _, err := p.SendMessage(msg)
 	if err != nil {
 		return err
