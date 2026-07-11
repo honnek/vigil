@@ -81,6 +81,9 @@ func (h *consumerHandler) flush(sess sarama.ConsumerGroupSession, buf []*pb.Metr
 	start := time.Now()
 
 	err := h.cb.Execute(func() error {
+		// TODO(trace): батч набирается из сообщений разных трейсов, поэтому SaveMetrics
+		// идёт отдельным трейсом (sess.Context() без trace-контекста сообщений).
+		// Для склейки с agent→collector→processor нужны span-links на трейсы вошедших сообщений. Возможно доделаю!
 		saveStream, err := h.storage.SaveMetrics(sess.Context())
 		if err != nil {
 			return err

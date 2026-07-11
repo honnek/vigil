@@ -46,7 +46,6 @@ func (s *MetricsServer) StreamMetrics(stream pb.MetricsService_StreamMetricsServ
 	for {
 		metric, err := stream.Recv()
 		if err == io.EOF {
-
 			return stream.SendAndClose(&pb.StreamSummary{
 				Received: received,
 				Rejected: rejected,

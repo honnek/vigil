@@ -13,12 +13,14 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/honnek/vigil/pkg/metrics"
+	"github.com/honnek/vigil/pkg/tracing"
 	pb "github.com/honnek/vigil/proto"
 	_ "github.com/honnek/vigil/services/api/docs"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/redis/go-redis/v9"
 	httpSwagger "github.com/swaggo/http-swagger"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -75,6 +77,16 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	otelAddr := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if otelAddr == "" {
+		otelAddr = "localhost:4317"
+	}
+	shutdown, err := tracing.Init(ctx, "vigil-api", otelAddr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer shutdown(context.Background())
+
 	conn, err := grpc.NewClient(storageAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal(err)
@@ -112,7 +124,7 @@ func main() {
 		r.Get("/alerts", hApi.alertsHandler)
 	})
 
-	server := http.Server{Addr: apiAddr, Handler: r}
+	server := http.Server{Addr: apiAddr, Handler: otelhttp.NewHandler(r, "vigil-api")}
 
 	go func() {
 		err = server.ListenAndServe()

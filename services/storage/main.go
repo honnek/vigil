@@ -11,11 +11,13 @@ import (
 
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/honnek/vigil/pkg/metrics"
+	"github.com/honnek/vigil/pkg/tracing"
 	pb "github.com/honnek/vigil/proto"
 	"github.com/honnek/vigil/services/storage/repository"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/redis/go-redis/v9"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 )
 
@@ -37,19 +39,31 @@ func main() {
 	server := grpc.NewServer(
 		grpc.ChainStreamInterceptor(srvMetrics.StreamServerInterceptor()),
 		grpc.ChainUnaryInterceptor(srvMetrics.UnaryServerInterceptor()),
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 	)
 	metricsAddr := os.Getenv("METRICS_ADDR")
 	if metricsAddr == "" {
 		metricsAddr = ":2112"
 	}
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	otelAddr := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if otelAddr == "" {
+		otelAddr = "localhost:4317"
+	}
+	shutdown, err := tracing.Init(ctx, "vigil-storage", otelAddr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer shutdown(context.Background())
+
 	dsn := os.Getenv("POSTGRES_DSN")
 	if dsn == "" {
 		dsn = "postgres://vigil:secret@localhost:5432/vigil?sslmode=disable"
 		log.Println("not found POSTGRES_DSN")
 	}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 
 	if err := RunMigrations(ctx, dsn); err != nil {
 		log.Fatal(err)
