@@ -49,9 +49,11 @@
 | Кэш         | Redis (горячие метрики)                          |
 | Миграции    | goose (embed + CLI)                             |
 | Драйвер БД  | pgx/v5 (pgxpool, CopyFrom)                       |
-| Метрики     | Prometheus + Grafana                            |
+| Метрики     | Prometheus + Grafana (RED-панели, `pkg/metrics`) |
+| Трейсинг    | OpenTelemetry + Jaeger (сквозной через Kafka)   |
 | Логи        | slog                                            |
 | Контейнеры  | Docker + docker-compose                         |
+| Оркестрация | Kubernetes (базовые манифесты, minikube)        |
 
 ---
 
@@ -83,8 +85,13 @@ vigil/
 │       ├── migrations/     # goose SQL-миграции
 │       └── repository/     # pgx: SaveBatch / List / EnsurePartitions
 ├── pkg/
-│   ├── kafka/              # продюсер + consumer group (sarama)
+│   ├── kafka/              # продюсер + consumer group (sarama) + trace-carrier
+│   ├── metrics/            # общий /metrics HTTP-сервер (Prometheus)
+│   ├── tracing/            # OTLP TracerProvider → Jaeger
 │   └── circuitbreaker/     # машина состояний Closed/Open/HalfOpen
+├── k8s/                    # Deployment/Service + ConfigMap/Secret (minikube)
+├── prometheus.yml          # scrape-конфиг всех сервисов
+├── grafana/                # provisioning datasource (Prometheus)
 ├── docker-compose.yml
 └── Makefile
 ```

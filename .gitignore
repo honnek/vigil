@@ -35,5 +35,7 @@ go.work.sum
 .DS_Store
 Thumbs.db
 
+k8s/secret.yaml
+
 # Личные заметки
 Vigil.md

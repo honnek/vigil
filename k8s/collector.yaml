@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: collector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: collector
+  template:
+    metadata:
+      labels:
+        app: collector
+    spec:
+      containers:
+        - name: collector
+          image: vigil-collector:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9090
+            - containerPort: 2112
+          envFrom:
+            - configMapRef:
+                name: vigil-config
+            - secretRef:
+                name: vigil-secret
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: collector
+spec:
+  selector:
+    app: collector
+  ports:
+    - name: grpc
+      port: 9090
+      targetPort: 9090
+    - name: metrics
+      port: 2112
+      targetPort: 2112

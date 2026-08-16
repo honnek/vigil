@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vigil-config
+data:
+  KAFKA_ADDR: "host.minikube.internal:9094"
+  REDIS_ADDR: "host.minikube.internal:6379"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "host.minikube.internal:4317"
+  STORAGE_ADDR: "storage:9091"
+  COLLECTOR_ADDR: "collector:9090"
+  METRICS_ADDR: ":2112"
+  API_ADDR: ":8080"

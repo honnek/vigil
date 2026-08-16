@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alerter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alerter
+  template:
+    metadata:
+      labels:
+        app: alerter
+    spec:
+      containers:
+        - name: alerter
+          image: vigil-alerter:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 2112
+          envFrom:
+            - configMapRef:
+                name: vigil-config
+            - secretRef:
+                name: vigil-secret

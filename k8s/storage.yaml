@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: storage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: storage
+  template:
+    metadata:
+      labels:
+        app: storage
+    spec:
+      containers:
+        - name: storage
+          image: vigil-storage:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9091
+            - containerPort: 2112
+          envFrom:
+            - configMapRef:
+                name: vigil-config
+            - secretRef:
+                name: vigil-secret
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: storage
+spec:
+  selector:
+    app: storage
+  ports:
+    - name: grpc
+      port: 9091
+      targetPort: 9091
+    - name: metrics
+      port: 2112
+      targetPort: 2112
