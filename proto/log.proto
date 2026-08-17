@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package log;
+
+option go_package = "github.com/honnek/vigil/proto;metric";
+
+import "google/protobuf/timestamp.proto";
+
+enum LogLevel {
+  LOG_LEVEL_UNSPECIFIED = 0;
+  DEBUG = 1;
+  INFO = 2;
+  WARN = 3;
+  ERROR = 4;
+}
+
+message LogEntry {
+  string host = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  LogLevel level = 3;
+  string service = 4;
+  string message = 5;
+  map<string,string> fields = 6;
+  string trace_id = 7;
+}
+
+message LogStreamSummary {
+  int64 received = 1;
+  int64 rejected = 2;
+}
+
+
+service LogIngest {
+  rpc StreamLogs(stream LogEntry) returns (LogStreamSummary);
+}
+
+message LogQuery {
+  LogLevel level_min = 1;
+  string service = 2;
+  string host = 3;
+  google.protobuf.Timestamp from = 4;
+  google.protobuf.Timestamp to = 5;
+  string text = 6;
+  int64 limit = 7;
+  int64 offset = 8;
+}
+
+message LogQueryResult {
+  repeated LogEntry entries = 1;
+  int64 total = 2;
+}
+
+service LogsQuery {
+  rpc QueryLogs(LogQuery) returns (LogQueryResult);
+}

@@ -10,8 +10,10 @@ import (
 
 	"github.com/honnek/vigil/pkg/tracing"
 	pb "github.com/honnek/vigil/proto"
+	"github.com/honnek/vigil/services/agent/logshipper"
 	"github.com/honnek/vigil/services/agent/source"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -27,6 +29,7 @@ func main() {
 	if collectorAddr == "" {
 		collectorAddr = "localhost:9090"
 	}
+	host, _ := os.Hostname()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -53,8 +56,14 @@ func main() {
 
 	servClient := pb.NewMetricsServiceClient(conn)
 
-	err = collectAndSend(ctx, servClient)
-	if err != nil {
+	logClient := pb.NewLogIngestClient(conn)
+	shipper := logshipper.NewShipper(logClient, host)
+
+	g, ctx := errgroup.WithContext(ctx)
+	g.Go(func() error { return collectAndSend(ctx, servClient) })
+	g.Go(func() error { return shipper.Run(ctx) })
+
+	if err := g.Wait(); err != nil {
 		log.Fatal(err)
 	}
 }
