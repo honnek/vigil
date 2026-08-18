@@ -47,3 +47,24 @@ migrate-down:
   # Статус миграций
 migrate-status:
 	goose -dir $(MIGRATIONS_DIR) postgres "$(DSN)" status
+
+
+  # --- ClickHouse (логи, vigil-logstorage) ---
+CH_DSN := clickhouse://vigil:secret@localhost:9000/vigil
+LOGS_MIGRATIONS_DIR := services/logstorage/migrations
+
+  # Создать миграцию логов: make migrate-logs-create name=add_something
+migrate-logs-create:
+	goose -dir $(LOGS_MIGRATIONS_DIR) create $(name) sql
+
+  # Накатить миграции логов
+migrate-logs:
+	goose -dir $(LOGS_MIGRATIONS_DIR) clickhouse "$(CH_DSN)" up
+
+  # Откатить последнюю
+migrate-logs-down:
+	goose -dir $(LOGS_MIGRATIONS_DIR) clickhouse "$(CH_DSN)" down
+
+  # Статус
+migrate-logs-status:
+	goose -dir $(LOGS_MIGRATIONS_DIR) clickhouse "$(CH_DSN)" status

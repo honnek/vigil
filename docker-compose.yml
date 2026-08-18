@@ -56,6 +56,33 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4317
     restart: unless-stopped
 
+  logstorage:
+    build:
+      context: .
+      dockerfile: services/logstorage/Dockerfile
+    image: vigil-logstorage
+    ports:
+      - "9095:9095"   # gRPC LogsQuery
+      - "2118:2112"   # метрики
+    depends_on:
+      kafka:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+    environment:
+      - KAFKA_ADDR=kafka:9092
+      - CH_ADDR=clickhouse:9000
+      - CLICKHOUSE_DB=vigil
+      - CLICKHOUSE_USER=vigil
+      - CLICKHOUSE_PASS=secret
+      - CLICKHOUSE_DSN=clickhouse://vigil:secret@clickhouse:9000/vigil
+      - GRPC_ADDR=:9095
+      - METRICS_ADDR=:2112
+      - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4317
+    restart: unless-stopped
+
   processor:
     build:
       context: .
@@ -123,12 +150,15 @@ services:
     depends_on:
       storage:
         condition: service_started
+      logstorage:
+        condition: service_started
       redis:
         condition: service_healthy
       jaeger:
         condition: service_started
     environment:
       - STORAGE_ADDR=storage:9091
+      - LOGSTORAGE_ADDR=logstorage:9095
       - API_ADDR=:8080
       - REDIS_ADDR=redis:6379
       - METRICS_ADDR=:2112
@@ -152,6 +182,33 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24-alpine
+    restart: unless-stopped
+    ports:
+      - "8123:8123"   # HTTP — UI/отладка, grafana-плагин
+      - "9000:9000"   # native TCP — сюда ходит Go-драйвер (clickhouse-go)
+    environment:
+      CLICKHOUSE_USER: vigil
+      CLICKHOUSE_PASSWORD: secret
+      CLICKHOUSE_DB: vigil
+      # разрешить обращение к БД под юзером с паролем без доп. настройки профилей
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    ulimits:
+      # ClickHouse держит много открытых файлов (куски MergeTree)
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - chdata:/var/lib/clickhouse
+    healthcheck:
+      # 127.0.0.1, а не localhost: внутри контейнера localhost=::1 (IPv6), а CH слушает только IPv4
+      test: ["CMD", "wget", "--no-verbose", "--spider", "-q", "127.0.0.1:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   redis:
     image: redis:7
@@ -221,11 +278,14 @@ services:
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=grafana-clickhouse-datasource   # датасорс ClickHouse — плагин
     depends_on:
       - prometheus
+      - clickhouse
     restart: unless-stopped
 
 volumes:
   pgdata:
   promdata:
   grafanadata:
+  chdata:

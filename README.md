@@ -45,7 +45,8 @@
 | ----------- | ----------------------------------------------- |
 | Транспорт   | gRPC + protobuf (streaming)                     |
 | Event bus   | Apache Kafka                                     |
-| Хранилище   | PostgreSQL (партиционирование по времени)        |
+| Хранилище   | PostgreSQL (метрики, партиционирование по времени) |
+| Хранилище логов | ClickHouse (MergeTree, партиции по дню, TTL, tokenbf-поиск) |
 | Кэш         | Redis (горячие метрики)                          |
 | Миграции    | goose (embed + CLI)                             |
 | Драйвер БД  | pgx/v5 (pgxpool, CopyFrom)                       |
@@ -61,13 +62,14 @@
 
 | Сервис            | Порт  | Роль                                                       |
 | ----------------- | ----- | ---------------------------------------------------------- |
-| `vigil-agent`     | —     | Сбор метрик хоста (CPU, RAM, диск) через Strategy → gRPC   |
-| `vigil-collector` | :9090 | Приём gRPC-потоков, валидация, publish в Kafka              |
+| `vigil-agent`     | —     | Сбор метрик хоста (CPU, RAM, диск) через Strategy + логи journald → gRPC |
+| `vigil-collector` | :9090 | Приём gRPC-потоков (метрики + логи), валидация, publish в Kafka |
 | `vigil-storage`   | :9091 | gRPC API записи/чтения метрик, PostgreSQL + Redis          |
+| `vigil-logstorage`| :9095 | Consume Kafka `logs.raw` → ClickHouse; gRPC чтение логов    |
 | `vigil-processor` | —     | Consume из Kafka, батч → storage, агрегация (скользящие средние) |
 | `vigil-alerter`   | —     | Оценка правил, дедупликация + renotify, silence            |
 | `vigil-notifier`  | —     | Доставка алертов в Telegram (консьюмер alerts + retry)     |
-| `vigil-api`       | :8080 | REST Gateway (chi), JWT, /metrics, /alerts, swagger        |
+| `vigil-api`       | :8080 | REST Gateway (chi), JWT, /metrics, /logs, /alerts, swagger  |
 
 ---
 
@@ -81,9 +83,12 @@ vigil/
 │   ├── collector/          # gRPC-сервер приёма + валидация + publish в Kafka
 │   ├── processor/          # consume Kafka → storage, агрегация (worker pool)
 │   ├── alerter/            # правила, дедуп/renotify, silence → топик alerts
-│   └── storage/            # gRPC + PostgreSQL (миграции, repository)
-│       ├── migrations/     # goose SQL-миграции
-│       └── repository/     # pgx: SaveBatch / List / EnsurePartitions
+│   ├── storage/            # gRPC + PostgreSQL (миграции, repository)
+│   │   ├── migrations/     # goose SQL-миграции
+│   │   └── repository/     # pgx: SaveBatch / List / EnsurePartitions
+│   └── logstorage/         # consume logs.raw → ClickHouse; gRPC чтение логов
+│       ├── migrations/     # goose (clickhouse-диалект)
+│       └── repository/     # clickhouse-go: SaveBatch (батч) / Query
 ├── pkg/
 │   ├── kafka/              # продюсер + consumer group (sarama) + trace-carrier
 │   ├── metrics/            # общий /metrics HTTP-сервер (Prometheus)
@@ -91,7 +96,7 @@ vigil/
 │   └── circuitbreaker/     # машина состояний Closed/Open/HalfOpen
 ├── k8s/                    # Deployment/Service + ConfigMap/Secret (minikube)
 ├── prometheus.yml          # scrape-конфиг всех сервисов
-├── grafana/                # provisioning datasource (Prometheus)
+├── grafana/                # provisioning: датасорсы (Prometheus + ClickHouse) и дашборд логов
 ├── docker-compose.yml
 └── Makefile
 ```

@@ -73,6 +73,10 @@ func main() {
 	if prometheusAddr == "" {
 		prometheusAddr = ":2112"
 	}
+	logStorageAddr := os.Getenv("LOGSTORAGE_ADDR")
+	if logStorageAddr == "" {
+		logStorageAddr = "localhost:9095"
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -93,6 +97,12 @@ func main() {
 	}
 	defer conn.Close()
 
+	connLogs, err := grpc.NewClient(logStorageAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer connLogs.Close()
+
 	redisClient := redis.NewClient(&redis.Options{Addr: redisAddr})
 	defer redisClient.Close()
 	if err := redisClient.Ping(ctx).Err(); err != nil {
@@ -101,6 +111,7 @@ func main() {
 
 	hApi := APIHandler{
 		storage:   pb.NewStorageServiceClient(conn),
+		logs:      pb.NewLogsQueryClient(connLogs),
 		rdb:       redisClient,
 		jwtSecret: []byte(jwt),
 		user:      user,
@@ -122,6 +133,7 @@ func main() {
 		r.Use(authMiddleware([]byte(jwt)))
 		r.Get("/metrics", hApi.metricsHandler)
 		r.Get("/alerts", hApi.alertsHandler)
+		r.Get("/logs", hApi.logsHandler)
 	})
 
 	server := http.Server{Addr: apiAddr, Handler: otelhttp.NewHandler(r, "vigil-api")}

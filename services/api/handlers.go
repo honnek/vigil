@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -17,6 +18,7 @@ import pb "github.com/honnek/vigil/proto"
 type APIHandler struct {
 	storage   pb.StorageServiceClient
 	rdb       *redis.Client
+	logs      pb.LogsQueryClient
 	jwtSecret []byte
 	user      string
 	password  string
@@ -33,6 +35,16 @@ type MetricDTO struct {
 type AlertDTO struct {
 	Host string `json:"host"`
 	Rule string `json:"rule"`
+}
+
+type LogDTO struct {
+	TS      time.Time         `json:"ts"`
+	Host    string            `json:"host"`
+	Service string            `json:"service"`
+	Level   string            `json:"level"`
+	Message string            `json:"message"`
+	TraceID string            `json:"trace_id,omitempty"`
+	Fields  map[string]string `json:"fields,omitempty"`
 }
 
 // metricsHandler godoc
@@ -187,4 +199,93 @@ func (h *APIHandler) alertsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+}
+
+// logsHandler godoc
+// @Summary  Поиск логов с фильтрами
+// @Tags     logs
+// @Produce  json
+// @Param    service query    string false "имя сервиса"
+// @Param    host    query    string false "хост"
+// @Param    level   query    string false "минимальный уровень: DEBUG/INFO/WARN/ERROR"
+// @Param    text    query    string false "поиск по тексту сообщения (целое слово)"
+// @Param    from    query    string false "начало периода, RFC3339"
+// @Param    to      query    string false "конец периода, RFC3339"
+// @Param    limit   query    int    false "макс. число записей (по умолчанию 100)"
+// @Param    offset  query    int    false "смещение для пагинации"
+// @Success  200     {array}  LogDTO
+// @Failure  400     {string} string "неверные параметры"
+// @Failure  401     {string} string "нет/невалидный токен"
+// @Failure  500     {string} string "ошибка logstorage"
+// @Security BearerAuth
+// @Router   /logs [get]
+func (h *APIHandler) logsHandler(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+
+	req := &pb.LogQuery{
+		Service:  q.Get("service"),
+		Host:     q.Get("host"),
+		Text:     q.Get("text"),
+		LevelMin: parseLevel(q.Get("level")),
+	}
+	if v := q.Get("from"); v != "" {
+		t, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			http.Error(w, "from must be RFC3339", 400)
+			return
+		}
+		req.From = timestamppb.New(t)
+	}
+	if v := q.Get("to"); v != "" {
+		t, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			http.Error(w, "to must be RFC3339", 400)
+			return
+		}
+		req.To = timestamppb.New(t)
+	}
+	if v := q.Get("limit"); v != "" {
+		limit, err := strconv.Atoi(v)
+		if err != nil {
+			http.Error(w, "limit must be an integer", 400)
+			return
+		}
+		req.Limit = int64(limit)
+	}
+	if v := q.Get("offset"); v != "" {
+		offset, err := strconv.Atoi(v)
+		if err != nil {
+			http.Error(w, "offset must be an integer", 400)
+			return
+		}
+		req.Offset = int64(offset)
+	}
+
+	res, err := h.logs.QueryLogs(r.Context(), req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	out := make([]LogDTO, 0, res.GetTotal())
+	for _, e := range res.Entries {
+		out = append(out, LogDTO{
+			TS: e.GetTimestamp().AsTime(), Host: e.GetHost(), Service: e.GetService(),
+			Level: e.GetLevel().String(), Message: e.GetMessage(),
+			TraceID: e.GetTraceId(), Fields: e.GetFields(),
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(out)
+	if err != nil {
+		log.Println("Error encoding logs: ", err)
+	}
+}
+
+func parseLevel(l string) pb.LogLevel {
+	if l == "" {
+		return pb.LogLevel_LOG_LEVEL_UNSPECIFIED
+	}
+	return pb.LogLevel(pb.LogLevel_value[strings.ToUpper(l)])
 }

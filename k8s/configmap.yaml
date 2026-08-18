@@ -10,3 +10,9 @@ data:
   COLLECTOR_ADDR: "collector:9090"
   METRICS_ADDR: ":2112"
   API_ADDR: ":8080"
+
+  CH_ADDR: "host.minikube.internal:9000"
+  CLICKHOUSE_DB: "vigil"
+  CLICKHOUSE_USER: "vigil"
+  LOGSTORAGE_ADDR: "logstorage:9095"
+  GRPC_ADDR: ":9095"

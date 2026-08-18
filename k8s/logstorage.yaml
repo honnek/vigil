@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logstorage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: logstorage
+  template:
+    metadata:
+      labels:
+        app: logstorage
+    spec:
+      containers:
+        - name: logstorage
+          image: vigil-logstorage:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9095
+            - containerPort: 2112
+          envFrom:
+            - configMapRef:
+                name: vigil-config
+            - secretRef:
+                name: vigil-secret
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: logstorage
+spec:
+  selector:
+    app: logstorage
+  ports:
+    - name: grpc
+      port: 9095
+      targetPort: 9095
+    - name: metrics
+      port: 2112
+      targetPort: 2112

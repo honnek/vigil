@@ -7,6 +7,25 @@ definitions:
       rule:
         type: string
     type: object
+  main.LogDTO:
+    properties:
+      fields:
+        additionalProperties:
+          type: string
+        type: object
+      host:
+        type: string
+      level:
+        type: string
+      message:
+        type: string
+      service:
+        type: string
+      trace_id:
+        type: string
+      ts:
+        type: string
+    type: object
   main.MetricDTO:
     properties:
       host:
@@ -84,6 +103,67 @@ paths:
       summary: Логин, выдаёт JWT-токен
       tags:
       - auth
+  /logs:
+    get:
+      parameters:
+      - description: имя сервиса
+        in: query
+        name: service
+        type: string
+      - description: хост
+        in: query
+        name: host
+        type: string
+      - description: 'минимальный уровень: DEBUG/INFO/WARN/ERROR'
+        in: query
+        name: level
+        type: string
+      - description: поиск по тексту сообщения (целое слово)
+        in: query
+        name: text
+        type: string
+      - description: начало периода, RFC3339
+        in: query
+        name: from
+        type: string
+      - description: конец периода, RFC3339
+        in: query
+        name: to
+        type: string
+      - description: макс. число записей (по умолчанию 100)
+        in: query
+        name: limit
+        type: integer
+      - description: смещение для пагинации
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/main.LogDTO'
+            type: array
+        "400":
+          description: неверные параметры
+          schema:
+            type: string
+        "401":
+          description: нет/невалидный токен
+          schema:
+            type: string
+        "500":
+          description: ошибка logstorage
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Поиск логов с фильтрами
+      tags:
+      - logs
   /metrics:
     get:
       parameters:
