@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"io"
 	"time"
 
@@ -49,6 +50,20 @@ func (s *StorageService) ListMetrics(req *pb.ListMetricsRequest, stream pb.Stora
 	}
 
 	return nil
+}
+
+func (s *StorageService) ListSeries(ctx context.Context, req *pb.ListSeriesRequest) (*pb.ListSeriesResponse, error) {
+	since := time.Time{}
+	if req.GetSince() != nil {
+		since = req.GetSince().AsTime()
+	}
+
+	series, err := s.repo.ListSeries(ctx, since)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.ListSeriesResponse{Series: series}, nil
 }
 
 func (s *StorageService) SaveMetrics(stream pb.StorageService_SaveMetricsServer) error {

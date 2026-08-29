@@ -23,6 +23,7 @@ type MetricFilter struct {
 type MetricRepository interface {
 	SaveBatch(ctx context.Context, metrics []*pb.Metric) error
 	List(ctx context.Context, f MetricFilter) ([]*pb.Metric, error)
+	ListSeries(ctx context.Context, since time.Time) ([]*pb.Series, error)
 }
 
 type PgMetricRepository struct {
@@ -105,6 +106,30 @@ func (r *PgMetricRepository) List(ctx context.Context, f MetricFilter) ([]*pb.Me
 			Labels:    labels,
 			Name:      name,
 		}, nil
+	})
+}
+
+func (r *PgMetricRepository) ListSeries(ctx context.Context, since time.Time) ([]*pb.Series, error) {
+	sql := `SELECT DISTINCT host, name 
+			FROM metrics`
+	args := make([]interface{}, 0)
+	if !since.IsZero() {
+		sql += " WHERE ts >= $1"
+		args = append(args, since)
+	}
+
+	rows, err := r.pool.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, fmt.Errorf("pgMetricRepository.ListSeries: %w", err)
+	}
+
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (*pb.Series, error) {
+		var host, name string
+		if err := row.Scan(&host, &name); err != nil {
+			return nil, err
+		}
+
+		return &pb.Series{Host: host, Name: name}, nil
 	})
 }
 

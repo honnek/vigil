@@ -150,6 +150,146 @@ func (x *SaveSummary) GetFailed() int64 {
 	return 0
 }
 
+type Series struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Host          string                 `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Series) Reset() {
+	*x = Series{}
+	mi := &file_storage_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Series) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Series) ProtoMessage() {}
+
+func (x *Series) ProtoReflect() protoreflect.Message {
+	mi := &file_storage_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Series.ProtoReflect.Descriptor instead.
+func (*Series) Descriptor() ([]byte, []int) {
+	return file_storage_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *Series) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *Series) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type ListSeriesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Since         *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=since,proto3" json:"since,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSeriesRequest) Reset() {
+	*x = ListSeriesRequest{}
+	mi := &file_storage_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSeriesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSeriesRequest) ProtoMessage() {}
+
+func (x *ListSeriesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_storage_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSeriesRequest.ProtoReflect.Descriptor instead.
+func (*ListSeriesRequest) Descriptor() ([]byte, []int) {
+	return file_storage_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ListSeriesRequest) GetSince() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Since
+	}
+	return nil
+}
+
+type ListSeriesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Series        []*Series              `protobuf:"bytes,1,rep,name=series,proto3" json:"series,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSeriesResponse) Reset() {
+	*x = ListSeriesResponse{}
+	mi := &file_storage_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSeriesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSeriesResponse) ProtoMessage() {}
+
+func (x *ListSeriesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_storage_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSeriesResponse.ProtoReflect.Descriptor instead.
+func (*ListSeriesResponse) Descriptor() ([]byte, []int) {
+	return file_storage_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ListSeriesResponse) GetSeries() []*Series {
+	if x != nil {
+		return x.Series
+	}
+	return nil
+}
+
 var File_storage_proto protoreflect.FileDescriptor
 
 const file_storage_proto_rawDesc = "" +
@@ -163,10 +303,19 @@ const file_storage_proto_rawDesc = "" +
 	"\x05limit\x18\x05 \x01(\x03R\x05limit\";\n" +
 	"\vSaveSummary\x12\x14\n" +
 	"\x05saved\x18\x01 \x01(\x03R\x05saved\x12\x16\n" +
-	"\x06failed\x18\x02 \x01(\x03R\x06failed2\x85\x01\n" +
+	"\x06failed\x18\x02 \x01(\x03R\x06failed\"0\n" +
+	"\x06Series\x12\x12\n" +
+	"\x04host\x18\x01 \x01(\tR\x04host\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"E\n" +
+	"\x11ListSeriesRequest\x120\n" +
+	"\x05since\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\x05since\"=\n" +
+	"\x12ListSeriesResponse\x12'\n" +
+	"\x06series\x18\x01 \x03(\v2\x0f.storage.SeriesR\x06series2\xcc\x01\n" +
 	"\x0eStorageService\x125\n" +
 	"\vSaveMetrics\x12\x0e.metric.Metric\x1a\x14.storage.SaveSummary(\x01\x12<\n" +
-	"\vListMetrics\x12\x1b.storage.ListMetricsRequest\x1a\x0e.metric.Metric0\x01B&Z$github.com/honnek/vigil/proto;metricb\x06proto3"
+	"\vListMetrics\x12\x1b.storage.ListMetricsRequest\x1a\x0e.metric.Metric0\x01\x12E\n" +
+	"\n" +
+	"ListSeries\x12\x1a.storage.ListSeriesRequest\x1a\x1b.storage.ListSeriesResponseB&Z$github.com/honnek/vigil/proto;metricb\x06proto3"
 
 var (
 	file_storage_proto_rawDescOnce sync.Once
@@ -180,25 +329,32 @@ func file_storage_proto_rawDescGZIP() []byte {
 	return file_storage_proto_rawDescData
 }
 
-var file_storage_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_storage_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_storage_proto_goTypes = []any{
 	(*ListMetricsRequest)(nil),    // 0: storage.ListMetricsRequest
 	(*SaveSummary)(nil),           // 1: storage.SaveSummary
-	(*timestamppb.Timestamp)(nil), // 2: google.protobuf.Timestamp
-	(*Metric)(nil),                // 3: metric.Metric
+	(*Series)(nil),                // 2: storage.Series
+	(*ListSeriesRequest)(nil),     // 3: storage.ListSeriesRequest
+	(*ListSeriesResponse)(nil),    // 4: storage.ListSeriesResponse
+	(*timestamppb.Timestamp)(nil), // 5: google.protobuf.Timestamp
+	(*Metric)(nil),                // 6: metric.Metric
 }
 var file_storage_proto_depIdxs = []int32{
-	2, // 0: storage.ListMetricsRequest.from:type_name -> google.protobuf.Timestamp
-	2, // 1: storage.ListMetricsRequest.to:type_name -> google.protobuf.Timestamp
-	3, // 2: storage.StorageService.SaveMetrics:input_type -> metric.Metric
-	0, // 3: storage.StorageService.ListMetrics:input_type -> storage.ListMetricsRequest
-	1, // 4: storage.StorageService.SaveMetrics:output_type -> storage.SaveSummary
-	3, // 5: storage.StorageService.ListMetrics:output_type -> metric.Metric
-	4, // [4:6] is the sub-list for method output_type
-	2, // [2:4] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	5, // 0: storage.ListMetricsRequest.from:type_name -> google.protobuf.Timestamp
+	5, // 1: storage.ListMetricsRequest.to:type_name -> google.protobuf.Timestamp
+	5, // 2: storage.ListSeriesRequest.since:type_name -> google.protobuf.Timestamp
+	2, // 3: storage.ListSeriesResponse.series:type_name -> storage.Series
+	6, // 4: storage.StorageService.SaveMetrics:input_type -> metric.Metric
+	0, // 5: storage.StorageService.ListMetrics:input_type -> storage.ListMetricsRequest
+	3, // 6: storage.StorageService.ListSeries:input_type -> storage.ListSeriesRequest
+	1, // 7: storage.StorageService.SaveMetrics:output_type -> storage.SaveSummary
+	6, // 8: storage.StorageService.ListMetrics:output_type -> metric.Metric
+	4, // 9: storage.StorageService.ListSeries:output_type -> storage.ListSeriesResponse
+	7, // [7:10] is the sub-list for method output_type
+	4, // [4:7] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_storage_proto_init() }
@@ -213,7 +369,7 @@ func file_storage_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_storage_proto_rawDesc), len(file_storage_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

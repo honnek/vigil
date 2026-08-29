@@ -1,0 +1,14 @@
+apiVersion: 1
+
+datasources:
+  - name: Postgres
+    type: postgres
+    uid: postgres
+    url: postgres:5432
+    user: vigil
+    jsonData:
+      database: vigil
+      sslmode: disable
+      postgresVersion: 1700
+    secureJsonData:
+      password: secret

@@ -87,6 +87,10 @@ func (r *CachingRepository) List(ctx context.Context, f MetricFilter) ([]*pb.Met
 	return r.next.List(ctx, f)
 }
 
+func (r *CachingRepository) ListSeries(ctx context.Context, since time.Time) ([]*pb.Series, error) {
+	return r.next.ListSeries(ctx, since)
+}
+
 func (r *CachingRepository) listFromCache(ctx context.Context, f MetricFilter) ([]*pb.Metric, error) {
 	key := cacheKey(f.Host, f.Name)
 

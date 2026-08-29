@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	StorageService_SaveMetrics_FullMethodName = "/storage.StorageService/SaveMetrics"
 	StorageService_ListMetrics_FullMethodName = "/storage.StorageService/ListMetrics"
+	StorageService_ListSeries_FullMethodName  = "/storage.StorageService/ListSeries"
 )
 
 // StorageServiceClient is the client API for StorageService service.
@@ -29,6 +30,7 @@ const (
 type StorageServiceClient interface {
 	SaveMetrics(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[Metric, SaveSummary], error)
 	ListMetrics(ctx context.Context, in *ListMetricsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[Metric], error)
+	ListSeries(ctx context.Context, in *ListSeriesRequest, opts ...grpc.CallOption) (*ListSeriesResponse, error)
 }
 
 type storageServiceClient struct {
@@ -71,12 +73,23 @@ func (c *storageServiceClient) ListMetrics(ctx context.Context, in *ListMetricsR
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type StorageService_ListMetricsClient = grpc.ServerStreamingClient[Metric]
 
+func (c *storageServiceClient) ListSeries(ctx context.Context, in *ListSeriesRequest, opts ...grpc.CallOption) (*ListSeriesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListSeriesResponse)
+	err := c.cc.Invoke(ctx, StorageService_ListSeries_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // StorageServiceServer is the server API for StorageService service.
 // All implementations must embed UnimplementedStorageServiceServer
 // for forward compatibility.
 type StorageServiceServer interface {
 	SaveMetrics(grpc.ClientStreamingServer[Metric, SaveSummary]) error
 	ListMetrics(*ListMetricsRequest, grpc.ServerStreamingServer[Metric]) error
+	ListSeries(context.Context, *ListSeriesRequest) (*ListSeriesResponse, error)
 	mustEmbedUnimplementedStorageServiceServer()
 }
 
@@ -92,6 +105,9 @@ func (UnimplementedStorageServiceServer) SaveMetrics(grpc.ClientStreamingServer[
 }
 func (UnimplementedStorageServiceServer) ListMetrics(*ListMetricsRequest, grpc.ServerStreamingServer[Metric]) error {
 	return status.Error(codes.Unimplemented, "method ListMetrics not implemented")
+}
+func (UnimplementedStorageServiceServer) ListSeries(context.Context, *ListSeriesRequest) (*ListSeriesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListSeries not implemented")
 }
 func (UnimplementedStorageServiceServer) mustEmbedUnimplementedStorageServiceServer() {}
 func (UnimplementedStorageServiceServer) testEmbeddedByValue()                        {}
@@ -132,13 +148,36 @@ func _StorageService_ListMetrics_Handler(srv interface{}, stream grpc.ServerStre
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type StorageService_ListMetricsServer = grpc.ServerStreamingServer[Metric]
 
+func _StorageService_ListSeries_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListSeriesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StorageServiceServer).ListSeries(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: StorageService_ListSeries_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StorageServiceServer).ListSeries(ctx, req.(*ListSeriesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // StorageService_ServiceDesc is the grpc.ServiceDesc for StorageService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var StorageService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "storage.StorageService",
 	HandlerType: (*StorageServiceServer)(nil),
-	Methods:     []grpc.MethodDesc{},
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ListSeries",
+			Handler:    _StorageService_ListSeries_Handler,
+		},
+	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "SaveMetrics",

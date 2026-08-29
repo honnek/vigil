@@ -31,3 +31,11 @@ scrape_configs:
     static_configs:
       - targets: [ "notifier:2112" ]
 
+  - job_name: vigil-analyzer
+    static_configs:
+      - targets: [ "analyzer:2112" ]
+
+  - job_name: vigil-logstorage
+    static_configs:
+      - targets: [ "logstorage:2112" ]
+

@@ -13,6 +13,7 @@ bin/
 /alerter
 /notifier
 /api
+/analyzer
 
 # Тесты и покрытие
 *.test

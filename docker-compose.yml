@@ -104,6 +104,36 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4317
     restart: unless-stopped
 
+  analyzer:
+    build:
+      context: .
+      dockerfile: services/analyzer/Dockerfile
+    image: vigil-analyzer
+    ports:
+      - "2119:2112"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      storage:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+    environment:
+      - KAFKA_ADDR=kafka:9092
+      - STORAGE_ADDR=storage:9091
+      - REDIS_ADDR=redis:6379
+      - METRICS_ADDR=:2112
+      - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4317
+      # тюнинг детектора (можно не задавать — есть дефолты)
+      - ANALYZE_INTERVAL=30s
+      - WINDOW=30m
+      - ZSCORE_THRESHOLD=3.0
+      - MIN_POINTS=20
+      - ANOMALY_DEDUP_TTL=10m
+    restart: unless-stopped
+
   alerter:
     build:
       context: .

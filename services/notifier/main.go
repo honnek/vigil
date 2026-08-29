@@ -30,6 +30,7 @@ var (
 
 const groupId = "vigil-notifier"
 const consumeTopic = "alerts"
+const anomalyTopic = "anomalies"
 
 func main() {
 
@@ -77,7 +78,7 @@ func main() {
 	h := NotifierHandler{notifier: notifier}
 
 	for {
-		err := cg.Consume(ctx, []string{consumeTopic}, &h)
+		err := cg.Consume(ctx, []string{consumeTopic, anomalyTopic}, &h)
 		if err != nil {
 			log.Println("consume error:", err)
 		}

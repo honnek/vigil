@@ -8,7 +8,6 @@ import "google/protobuf/timestamp.proto";
 import "metric.proto";
 
 
-
 message ListMetricsRequest {
   string host = 1;
   string name = 2;
@@ -22,7 +21,21 @@ message SaveSummary {
   int64 failed = 2;
 }
 
+message Series {
+  string host = 1;
+  string name = 2;
+}
+
+message ListSeriesRequest {
+  google.protobuf.Timestamp since = 1;
+}
+
+message ListSeriesResponse {
+  repeated Series series = 1;
+}
+
 service StorageService {
   rpc SaveMetrics(stream metric.Metric) returns (SaveSummary);
   rpc ListMetrics(ListMetricsRequest) returns (stream metric.Metric);
+  rpc ListSeries(ListSeriesRequest) returns (ListSeriesResponse);
 }
