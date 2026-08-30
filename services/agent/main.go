@@ -22,6 +22,7 @@ var sources = []source.Source{
 	&source.CPUSource{},
 	&source.RAMSource{},
 	&source.DiskSource{},
+	&source.DiskIOSource{},
 }
 
 func main() {

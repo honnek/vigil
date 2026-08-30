@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"time"
 
 	pb "github.com/honnek/vigil/proto"
 	"github.com/shirou/gopsutil/v3/cpu"
@@ -21,6 +22,11 @@ type Source interface {
 type CPUSource struct {
 }
 
+type DiskIOSource struct {
+	prevWrite uint64
+	prevTime  time.Time
+}
+
 func (s *CPUSource) Collect() ([]*pb.Metric, error) {
 	var metrics []*pb.Metric
 	percentages, err := cpu.Percent(0, true)
@@ -35,6 +41,37 @@ func (s *CPUSource) Collect() ([]*pb.Metric, error) {
 	}
 
 	return metrics, nil
+}
+
+func (s *DiskIOSource) Collect() ([]*pb.Metric, error) {
+	counters, err := disk.IOCounters()
+	if err != nil {
+		return nil, err
+	}
+
+	var totalWrite uint64
+	for _, counter := range counters {
+		totalWrite += counter.WriteBytes
+	}
+
+	now := time.Now()
+	if s.prevTime.IsZero() {
+		s.prevWrite, s.prevTime = totalWrite, now
+		return nil, nil
+	}
+
+	if totalWrite < s.prevWrite {
+		s.prevWrite, s.prevTime = totalWrite, now
+		return nil, nil
+	}
+
+	dt := now.Sub(s.prevTime).Seconds()
+	rate := float64(totalWrite-s.prevWrite) / dt
+	s.prevWrite, s.prevTime = totalWrite, now
+
+	return []*pb.Metric{
+		newMetric("disk_write_bytes_per_sec", rate, pb.MetricType_METRIC_TYPE_DISK),
+	}, nil
 }
 
 type RAMSource struct {

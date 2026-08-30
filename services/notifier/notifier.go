@@ -41,16 +41,26 @@ func (t *TelegramNotifier) Send(ctx context.Context, alert *pb.Alert) error {
 }
 
 func (t *TelegramNotifier) SendAnomaly(ctx context.Context, a *pb.Anomaly) error {
-	text := fmt.Sprintf("⚠️  Аномалия: %s на %s = %.2f (норма %.2f±%.2f, z=%.1f, увер. %.0f%%)",
-		a.GetMetricName(), a.GetHost(), a.GetValue(), a.GetMean(), a.GetStdDev(),
-		a.GetZscore(), a.GetConfidence()*100)
+	conf := a.GetConfidence() * 100
+	var text string
 
-	err := t.SendText(ctx, text)
-	if err != nil {
-		return err
+	switch a.GetPattern() {
+	case "miner":
+		text = fmt.Sprintf("⛏️ Майнер: CPU-плато на %s = %.1f%% (увер. %.0f%%)",
+			a.GetHost(), a.GetValue(), conf)
+	case "memory_leak":
+		text = fmt.Sprintf("🧠 Утечка памяти на %s: RAM %.1f%% и растёт (увер. %.0f%%)",
+			a.GetHost(), a.GetValue(), conf)
+	case "ransomware":
+		text = fmt.Sprintf("🔒 Ransomware: всплеск записи на %s = %.1f МБ/с (увер. %.0f%%)",
+			a.GetHost(), a.GetValue()/1024/1024, conf)
+	default: // "zscore" и всё прочее — статистическая аномалия
+		text = fmt.Sprintf("⚠️ Аномалия: %s на %s = %.2f (норма %.2f±%.2f, z=%.1f, увер. %.0f%%)",
+			a.GetMetricName(), a.GetHost(), a.GetValue(), a.GetMean(), a.GetStdDev(),
+			a.GetZscore(), conf)
 	}
 
-	return nil
+	return t.SendText(ctx, text)
 }
 
 func (t *TelegramNotifier) SendText(ctx context.Context, text string) error {

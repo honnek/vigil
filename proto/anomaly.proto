@@ -15,4 +15,5 @@ message Anomaly {
   double zscore = 6;
   double confidence = 7;
   google.protobuf.Timestamp timestamp = 8;
+  string pattern = 9;
 }

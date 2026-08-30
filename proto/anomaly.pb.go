@@ -32,6 +32,7 @@ type Anomaly struct {
 	Zscore        float64                `protobuf:"fixed64,6,opt,name=zscore,proto3" json:"zscore,omitempty"`
 	Confidence    float64                `protobuf:"fixed64,7,opt,name=confidence,proto3" json:"confidence,omitempty"`
 	Timestamp     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	Pattern       string                 `protobuf:"bytes,9,opt,name=pattern,proto3" json:"pattern,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -122,11 +123,18 @@ func (x *Anomaly) GetTimestamp() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *Anomaly) GetPattern() string {
+	if x != nil {
+		return x.Pattern
+	}
+	return ""
+}
+
 var File_anomaly_proto protoreflect.FileDescriptor
 
 const file_anomaly_proto_rawDesc = "" +
 	"\n" +
-	"\ranomaly.proto\x12\aanomaly\x1a\x1fgoogle/protobuf/timestamp.proto\"\xf3\x01\n" +
+	"\ranomaly.proto\x12\aanomaly\x1a\x1fgoogle/protobuf/timestamp.proto\"\x8d\x02\n" +
 	"\aAnomaly\x12\x12\n" +
 	"\x04host\x18\x01 \x01(\tR\x04host\x12\x1f\n" +
 	"\vmetric_name\x18\x02 \x01(\tR\n" +
@@ -138,7 +146,8 @@ const file_anomaly_proto_rawDesc = "" +
 	"\n" +
 	"confidence\x18\a \x01(\x01R\n" +
 	"confidence\x128\n" +
-	"\ttimestamp\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\ttimestampB&Z$github.com/honnek/vigil/proto;metricb\x06proto3"
+	"\ttimestamp\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12\x18\n" +
+	"\apattern\x18\t \x01(\tR\apatternB&Z$github.com/honnek/vigil/proto;metricb\x06proto3"
 
 var (
 	file_anomaly_proto_rawDescOnce sync.Once

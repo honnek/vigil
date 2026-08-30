@@ -12,15 +12,26 @@ type Config struct {
 	ZThreshold float64
 	MinPoints  int
 	DedupTTL   time.Duration
+	// детектор майнера
+	MinerThreshold float64
+	MinerDuration  time.Duration
+	// детектор утечки памяти
+	LeakMinGrowth float64
+	// детектор ransomware (порог скорости записи, bytes/sec)
+	WriteThreshold float64
 }
 
 func Load() Config {
 	return Config{
-		Interval:   envDuration("ANALYZE_INTERVAL", 30*time.Second),
-		Window:     envDuration("WINDOW", 30*time.Minute),
-		ZThreshold: envFloat("ZSCORE_THRESHOLD", 3.0),
-		MinPoints:  envInt("MIN_POINTS", 20),
-		DedupTTL:   envDuration("ANOMALY_DEDUP_TTL", 10*time.Minute),
+		Interval:       envDuration("ANALYZE_INTERVAL", 30*time.Second),
+		Window:         envDuration("WINDOW", 30*time.Minute),
+		ZThreshold:     envFloat("ZSCORE_THRESHOLD", 3.0),
+		MinPoints:      envInt("MIN_POINTS", 20),
+		DedupTTL:       envDuration("ANOMALY_DEDUP_TTL", 10*time.Minute),
+		MinerThreshold: envFloat("MINER_THRESHOLD", 85),
+		MinerDuration:  envDuration("MINER_DURATION", 10*time.Minute),
+		LeakMinGrowth:  envFloat("LEAK_MIN_GROWTH", 5),
+		WriteThreshold: envFloat("RANSOMWARE_WRITE_BYTES", 50*1024*1024),
 	}
 }
 

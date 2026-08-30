@@ -19,10 +19,16 @@ import (
 )
 
 type Analyzer struct {
-	storage  pb.StorageServiceClient
-	rdb      *redis.Client
-	producer sarama.SyncProducer
-	cfg      Config
+	storage   pb.StorageServiceClient
+	rdb       *redis.Client
+	producer  sarama.SyncProducer
+	Detectors []Detector
+	cfg       Config
+}
+
+type Point struct {
+	Value float64
+	TS    time.Time
 }
 
 const anomalyTopic = "anomalies"
@@ -45,44 +51,59 @@ func (a *Analyzer) Run(ctx context.Context) error {
 			continue
 		}
 		seriesChecked.Inc()
-		vals, last, err := a.fetchWindow(ctx, s)
+		all, err := a.fetchWindow(ctx, s)
 		if err != nil {
 			log.Printf("fetchWindow %s/%s: %v", s.GetHost(), s.GetName(), err)
 			continue
 		}
-		if len(vals) < a.cfg.MinPoints {
+		if len(all) < a.cfg.MinPoints {
 			continue
 		}
 
+		latest := all[0].Value // новейшая точка — проверяемая
+		history := all[1:]     // baseline без новейшей
+
+		// --- Z-score baseline ---
+		vals := values(history)
 		mean, ok1 := stats.Mean(vals)
 		sd, ok2 := stats.StdDev(vals)
-		if !ok1 || !ok2 {
-			continue
-		}
-		z, ok3 := stats.ZScore(last, mean, sd)
-		if !ok3 {
-			continue
-		}
-
-		if math.Abs(z) > a.cfg.ZThreshold {
-			key := fmt.Sprintf("anomaly:%s:%s", s.GetHost(), s.GetName())
-			isNew, err := a.rdb.SetNX(ctx, key, z, a.cfg.DedupTTL).Result()
-			if err != nil {
-				// Redis недоступен → шлём без дедупа (лучше спам, чем пропуск)
-				log.Printf("SetNX %s: %v", key, err)
-			} else if !isNew {
-				continue // дубль в пределах TTL — молчим
+		z, ok3 := stats.ZScore(latest, mean, sd)
+		if ok1 && ok2 && ok3 && math.Abs(z) > a.cfg.ZThreshold {
+			if a.allowPublish(ctx, s, "zscore", z) {
+				a.publish(ctx, s, latest, mean, sd, z, confidence(z, a.cfg.ZThreshold), "zscore")
 			}
+		}
 
-			a.publish(ctx, s, last, mean, sd, z)
+		// --- Детекторы паттернов (майнер и т.д.) ---
+		for _, d := range a.Detectors {
+			if !d.Applies(s.GetName()) {
+				continue
+			}
+			conf, matched := d.Detect(all) // полное окно
+			if !matched {
+				continue
+			}
+			if a.allowPublish(ctx, s, d.Name(), conf) {
+				a.publish(ctx, s, latest, 0, 0, 0, conf, d.Name())
+			}
 		}
 	}
 
 	return nil
 }
 
-func (a *Analyzer) publish(ctx context.Context, s *pb.Series, val, mean, sd, z float64) {
-	confidence := confidence(z, a.cfg.ZThreshold)
+// allowPublish — дедуп по ключу host:metric:pattern. Redis недоступен → шлём (без дедупа).
+func (a *Analyzer) allowPublish(ctx context.Context, s *pb.Series, pattern string, val float64) bool {
+	key := fmt.Sprintf("anomaly:%s:%s:%s", s.GetHost(), s.GetName(), pattern)
+	isNew, err := a.rdb.SetNX(ctx, key, val, a.cfg.DedupTTL).Result()
+	if err != nil {
+		log.Printf("SetNX %s: %v", key, err)
+		return true
+	}
+	return isNew
+}
+
+func (a *Analyzer) publish(ctx context.Context, s *pb.Series, val, mean, sd, z, conf float64, pattern string) {
 	anomaly := pb.Anomaly{
 		Host:       s.Host,
 		MetricName: s.Name,
@@ -90,7 +111,8 @@ func (a *Analyzer) publish(ctx context.Context, s *pb.Series, val, mean, sd, z f
 		Mean:       mean,
 		StdDev:     sd,
 		Zscore:     z,
-		Confidence: confidence,
+		Confidence: conf,
+		Pattern:    pattern,
 		Timestamp:  timestamppb.New(time.Now()),
 	}
 	pubMsg, _ := proto.Marshal(&anomaly)
@@ -101,7 +123,8 @@ func (a *Analyzer) publish(ctx context.Context, s *pb.Series, val, mean, sd, z f
 	}
 }
 
-func (a *Analyzer) fetchWindow(ctx context.Context, s *pb.Series) (history []float64, latest float64, err error) {
+// fetchWindow возвращает полное окно точек серии (DESC: [0] — новейшая).
+func (a *Analyzer) fetchWindow(ctx context.Context, s *pb.Series) ([]Point, error) {
 	stream, err := a.storage.ListMetrics(ctx, &pb.ListMetricsRequest{
 		Host: s.Host,
 		Name: s.Name,
@@ -109,29 +132,23 @@ func (a *Analyzer) fetchWindow(ctx context.Context, s *pb.Series) (history []flo
 		To:   timestamppb.New(time.Now()),
 	})
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
-	all := make([]float64, 0)
+	all := make([]Point, 0)
 
 	for {
 		metric, recvErr := stream.Recv()
 		if recvErr == io.EOF {
-			err = nil
 			break
 		}
 		if recvErr != nil {
-			return nil, 0, recvErr
+			return nil, recvErr
 		}
-		all = append(all, metric.Value)
+
+		all = append(all, Point{Value: metric.GetValue(), TS: metric.GetTimestamp().AsTime()})
 	}
 
-	if len(all) < 2 {
-		return nil, 0, nil
-	}
-	latest = all[0]
-	history = all[1:]
-
-	return
+	return all, nil
 }
 
 func skip(name string) bool {
@@ -147,4 +164,12 @@ func confidence(z, threshold float64) float64 {
 		c = 1
 	}
 	return c
+}
+
+func values(points []Point) []float64 {
+	vs := make([]float64, len(points))
+	for i, point := range points {
+		vs[i] = point.Value
+	}
+	return vs
 }

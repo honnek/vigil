@@ -91,7 +91,12 @@ func main() {
 		storage:  storageClient,
 		rdb:      redisClient,
 		producer: producer,
-		cfg:      cfg,
+		Detectors: []Detector{
+			&MinerDetector{Threshold: cfg.MinerThreshold, Duration: cfg.MinerDuration},
+			&MemoryLeakDetector{MinGrowth: cfg.LeakMinGrowth},
+			&RansomwareDetector{WriteThreshold: cfg.WriteThreshold},
+		},
+		cfg: cfg,
 	}
 
 	metrics.Serve(prometheusMetricsAddr)
