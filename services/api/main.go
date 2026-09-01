@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"log"
 	"net/http"
 	"os"
@@ -24,6 +25,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
+
+//go:embed static/index.html
+var indexHTML []byte
 
 var (
 	httpRequests = promauto.NewCounterVec(prometheus.CounterOpts{
@@ -122,6 +126,11 @@ func main() {
 	r.Use(middleware.Logger, middleware.Recoverer, prometheusMiddleware)
 
 	r.Get("/swagger/*", httpSwagger.WrapHandler)
+
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(indexHTML)
+	})
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

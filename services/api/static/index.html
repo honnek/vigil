@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vigil</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#15111c; --panel:#1e1830; --panel2:#241d38; --line:#332a4a;
+    --fg:#e7e2f0; --muted:#8a80a6; --accent:#ff5fd7; --accent2:#42d392;
+    --err:#ff5f6d; --warn:#ffcf5f; --info:#5fb4ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  a{color:var(--accent)}
+  .hidden{display:none!important}
+
+  /* login */
+  #login{min-height:100vh;display:flex;align-items:center;justify-content:center}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:28px 32px;width:320px}
+  .card h1{margin:0 0 4px;color:var(--accent);font-size:22px;letter-spacing:1px}
+  .card p{margin:0 0 20px;color:var(--muted);font-size:12px}
+  label{display:block;font-size:12px;color:var(--muted);margin:12px 0 4px}
+  input{width:100%;padding:9px 11px;background:var(--panel2);border:1px solid var(--line);
+    border-radius:7px;color:var(--fg);font:inherit}
+  input:focus{outline:none;border-color:var(--accent)}
+  button{cursor:pointer;font:inherit}
+  .btn{margin-top:18px;width:100%;padding:10px;background:var(--accent);color:#1a1020;
+    border:none;border-radius:7px;font-weight:700}
+  .btn:hover{filter:brightness(1.08)}
+  .msg{margin-top:12px;font-size:12px;color:var(--err);min-height:16px}
+
+  /* app */
+  header{display:flex;align-items:center;gap:6px;padding:10px 16px;
+    background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0}
+  header .brand{color:var(--accent);font-weight:700;letter-spacing:1px;margin-right:14px}
+  .tab{padding:7px 14px;border-radius:7px;color:var(--muted);border:1px solid transparent;
+    background:none}
+  .tab:hover{color:var(--fg)}
+  .tab.active{color:var(--accent);border-color:var(--accent);font-weight:700}
+  header .spacer{flex:1}
+  header .status{color:var(--muted);font-size:12px;margin-right:10px}
+  .logout{color:var(--muted);background:none;border:1px solid var(--line);
+    border-radius:7px;padding:6px 12px}
+  .logout:hover{color:var(--fg)}
+
+  main{padding:18px 16px;max-width:1100px;margin:0 auto}
+  h2{margin:0 0 12px;font-size:15px;color:var(--accent);font-weight:700}
+  .count{color:var(--muted);font-weight:400}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;color:var(--muted);font-weight:600;padding:6px 10px;
+    border-bottom:1px solid var(--line)}
+  td{padding:6px 10px;border-bottom:1px solid var(--panel2)}
+  tr:hover td{background:var(--panel)}
+  .empty{color:var(--muted);padding:20px 0}
+
+  .lvl{font-weight:700}
+  .lvl.ERROR{color:var(--err)} .lvl.WARN{color:var(--warn)}
+  .lvl.INFO{color:var(--info)} .lvl.DEBUG{color:var(--muted)}
+
+  /* metrics */
+  .metrics{display:grid;grid-template-columns:200px 220px 1fr;gap:14px;align-items:start}
+  .list{background:var(--panel);border:1px solid var(--line);border-radius:9px;
+    max-height:420px;overflow:auto}
+  .list .lhead{padding:8px 12px;color:var(--muted);font-size:12px;
+    border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)}
+  .item{padding:7px 12px;cursor:pointer;border-bottom:1px solid var(--panel2);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .item:hover{background:var(--panel2)}
+  .item.sel{color:var(--accent);background:var(--panel2);font-weight:700}
+  .chartbox{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:14px}
+  .chartbox .h{color:var(--muted);font-size:13px;margin-bottom:8px}
+  .chartbox .h b{color:var(--fg)}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <div class="card">
+    <h1>VIGIL</h1>
+    <p>Distributed Observability</p>
+    <label>Username</label>
+    <input id="u" autocomplete="username" value="admin">
+    <label>Password</label>
+    <input id="p" type="password" autocomplete="current-password">
+    <button class="btn" onclick="doLogin()">Войти</button>
+    <div class="msg" id="loginMsg"></div>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <header>
+    <span class="brand">VIGIL</span>
+    <button class="tab active" data-tab="alerts" onclick="switchTab('alerts')">Alerts</button>
+    <button class="tab" data-tab="logs" onclick="switchTab('logs')">Logs</button>
+    <button class="tab" data-tab="metrics" onclick="switchTab('metrics')">Metrics</button>
+    <span class="spacer"></span>
+    <span class="status" id="status"></span>
+    <button class="logout" onclick="refresh()" title="Обновить сейчас">↻ Обновить</button>
+    <button class="logout" onclick="logout()">Выйти</button>
+  </header>
+  <main id="content"></main>
+</div>
+
+<script>
+"use strict";
+let token = null;
+let active = "alerts";
+let timer = null;
+
+// состояние вкладки metrics
+let series = [];
+let hostsCache = [];
+let selHost = null, selName = null;
+let chart = null;
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+
+async function doLogin() {
+  const msg = $("#loginMsg");
+  msg.textContent = "";
+  try {
+    const r = await fetch("/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: $("#u").value, password: $("#p").value }),
+    });
+    if (!r.ok) { msg.textContent = "Неверные учётные данные"; return; }
+    const data = await r.json();
+    token = data.signed;
+    try { localStorage.setItem("vigil_token", token); } catch (e) {}
+    $("#login").classList.add("hidden");
+    $("#app").classList.remove("hidden");
+    switchTab("alerts");
+  } catch (e) {
+    msg.textContent = "Ошибка соединения: " + e.message;
+  }
+}
+
+function logout() {
+  token = null;
+  try { localStorage.removeItem("vigil_token"); } catch (e) {}
+  clearInterval(timer);
+  if (chart) { chart.destroy(); chart = null; }
+  series = []; selHost = null; selName = null;
+  $("#app").classList.add("hidden");
+  $("#login").classList.remove("hidden");
+  $("#p").value = "";
+}
+
+// авторизованный GET
+async function api(path) {
+  const r = await fetch(path, { headers: { Authorization: "Bearer " + token } });
+  if (r.status === 401) { logout(); throw new Error("unauthorized"); }
+  if (!r.ok) throw new Error(path + ": " + r.status);
+  return r.json();
+}
+
+function setStatus(txt, isErr) {
+  const s = $("#status");
+  s.textContent = txt;
+  s.style.color = isErr ? "var(--err)" : "var(--muted)";
+}
+const now = () => new Date().toLocaleTimeString();
+
+function switchTab(tab) {
+  active = tab;
+  document.querySelectorAll(".tab").forEach(b =>
+    b.classList.toggle("active", b.dataset.tab === tab));
+  if (chart) { chart.destroy(); chart = null; }
+  clearInterval(timer);
+  refresh();
+  timer = setInterval(refresh, 3000);
+}
+
+function refresh() {
+  if (!token) return;
+  if (active === "alerts") loadAlerts();
+  else if (active === "logs") loadLogs();
+  else if (active === "metrics") loadMetrics();
+}
+
+async function loadAlerts() {
+  try {
+    const rows = (await api("/alerts")) || [];
+    let html = `<h2>Active alerts <span class="count">(${rows.length})</span></h2>`;
+    if (!rows.length) html += `<div class="empty">Нет активных алертов</div>`;
+    else {
+      html += `<table><thead><tr><th>Host</th><th>Rule</th></tr></thead><tbody>`;
+      for (const a of rows) html += `<tr><td>${esc(a.host)}</td><td>${esc(a.rule)}</td></tr>`;
+      html += `</tbody></table>`;
+    }
+    $("#content").innerHTML = html;
+    setStatus("updated " + now());
+  } catch (e) { setStatus("ERR: " + e.message, true); }
+}
+
+async function loadLogs() {
+  try {
+    const rows = (await api("/logs?limit=100")) || [];
+    let html = `<h2>Logs <span class="count">(${rows.length})</span></h2>`;
+    if (!rows.length) html += `<div class="empty">Логов нет</div>`;
+    else {
+      html += `<table><thead><tr><th>Time</th><th>Level</th><th>Service</th><th>Host</th><th>Message</th></tr></thead><tbody>`;
+      for (const l of rows) {
+        const t = l.ts ? new Date(l.ts).toLocaleTimeString() : "";
+        html += `<tr><td>${t}</td><td class="lvl ${esc(l.level)}">${esc(l.level)}</td>`
+             +  `<td>${esc(l.service)}</td><td>${esc(l.host)}</td><td>${esc(l.message)}</td></tr>`;
+      }
+      html += `</tbody></table>`;
+    }
+    $("#content").innerHTML = html;
+    setStatus("updated " + now());
+  } catch (e) { setStatus("ERR: " + e.message, true); }
+}
+
+// ---- metrics ----
+async function loadMetrics() {
+  try {
+    series = (await api("/series")) || [];
+    const hosts = [...new Set(series.map(s => s.host))].sort();
+    // на первом заходе или если host пропал — выбрать первый
+    if (!selHost || !hosts.includes(selHost)) { selHost = hosts[0] || null; selName = null; }
+    hostsCache = hosts;
+    renderMetrics();
+    if (selHost && selName) drawChart();  // живое обновление выбранного графика
+    setStatus("updated " + now());
+  } catch (e) { setStatus("ERR: " + e.message, true); }
+}
+
+function namesFor(host) {
+  return [...new Set(series.filter(s => s.host === host).map(s => s.name))].sort();
+}
+
+function renderMetrics() {
+  const names = selHost ? namesFor(selHost) : [];
+  const hostItems = hostsCache.map(h =>
+    `<div class="item ${h === selHost ? "sel" : ""}" onclick="pickHost('${esc(h)}')">${esc(h)}</div>`).join("");
+  const nameItems = names.map(n =>
+    `<div class="item ${n === selName ? "sel" : ""}" onclick="pickName('${esc(n)}')">${esc(n)}</div>`).join("")
+    || `<div class="empty" style="padding:12px">—</div>`;
+
+  $("#content").innerHTML = `
+    <h2>Metrics</h2>
+    <div class="metrics">
+      <div class="list"><div class="lhead">Hosts</div>${hostItems || '<div class="empty" style="padding:12px">no series</div>'}</div>
+      <div class="list"><div class="lhead">${esc(selHost || "")}</div>${nameItems}</div>
+      <div class="chartbox">
+        <div class="h">${selName ? `<b>${esc(selHost)}</b> · ${esc(selName)} (last 15m)` : "выберите метрику слева"}</div>
+        <canvas id="chart" height="120"></canvas>
+      </div>
+    </div>`;
+  if (selHost && selName) drawChart();
+}
+
+function pickHost(h) { selHost = h; selName = null; if (chart){chart.destroy();chart=null;} renderMetrics(); }
+function pickName(n) { selName = n; renderMetrics(); }
+
+async function drawChart() {
+  try {
+    const to = new Date();
+    const from = new Date(Date.now() - 15 * 60 * 1000);
+    const q = new URLSearchParams({
+      host: selHost, name: selName,
+      from: from.toISOString(), to: to.toISOString(), limit: "60",
+    });
+    const pts = (await api("/metrics?" + q.toString())) || [];
+    pts.sort((a, b) => new Date(a.ts) - new Date(b.ts));  // по возрастанию времени
+    const labels = pts.map(p => new Date(p.ts).toLocaleTimeString());
+    const values = pts.map(p => p.value);
+
+    const canvas = $("#chart");
+    if (!canvas) return;
+    if (chart) chart.destroy();
+    chart = new Chart(canvas, {
+      type: "line",
+      data: { labels, datasets: [{
+        data: values, borderColor: "#42d392", backgroundColor: "rgba(66,211,146,.12)",
+        fill: true, tension: .25, pointRadius: 0, borderWidth: 2,
+      }]},
+      options: {
+        animation: false, responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: "#8a80a6", maxTicksLimit: 6 }, grid: { color: "#241d38" } },
+          y: { ticks: { color: "#8a80a6" }, grid: { color: "#241d38" } },
+        },
+      },
+    });
+  } catch (e) { setStatus("ERR: " + e.message, true); }
+}
+
+// enter в поле пароля = логин
+$("#p").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+
+// восстановить сессию после перезагрузки страницы
+try {
+  const saved = localStorage.getItem("vigil_token");
+  if (saved) {
+    token = saved;
+    $("#login").classList.add("hidden");
+    $("#app").classList.remove("hidden");
+    switchTab("alerts");   // если токен протух — api() поймает 401 и разлогинит
+  }
+} catch (e) {}
+</script>
+</body>
+</html>
