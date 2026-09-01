@@ -37,6 +37,11 @@ type AlertDTO struct {
 	Rule string `json:"rule"`
 }
 
+type SeriesDTO struct {
+	Host string `json:"host"`
+	Name string `json:"name"`
+}
+
 type LogDTO struct {
 	TS      time.Time         `json:"ts"`
 	Host    string            `json:"host"`
@@ -117,6 +122,47 @@ func (h *APIHandler) metricsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(out)
 	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// seriesHandler godoc
+// @Summary  Список рядов (host + имя метрики) для пикеров
+// @Tags     metrics
+// @Produce  json
+// @Param    since query    string false "показывать ряды, активные после этого момента, RFC3339 (по умолчанию now-1h)"
+// @Success  200   {array}  SeriesDTO
+// @Failure  400   {string} string "неверные параметры"
+// @Failure  401   {string} string "нет/невалидный токен"
+// @Failure  500   {string} string "ошибка storage"
+// @Security BearerAuth
+// @Router   /series [get]
+func (h *APIHandler) seriesHandler(w http.ResponseWriter, r *http.Request) {
+	since := time.Now().Add(-time.Hour)
+	if v := r.URL.Query().Get("since"); v != "" {
+		t, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			http.Error(w, "since must be in RFC3339 format", http.StatusBadRequest)
+			return
+		}
+		since = t
+	}
+
+	resp, err := h.storage.ListSeries(r.Context(), &pb.ListSeriesRequest{
+		Since: timestamppb.New(since),
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	out := make([]SeriesDTO, 0, len(resp.GetSeries()))
+	for _, s := range resp.GetSeries() {
+		out = append(out, SeriesDTO{Host: s.GetHost(), Name: s.GetName()})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(out); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

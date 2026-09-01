@@ -41,6 +41,13 @@ definitions:
       value:
         type: number
     type: object
+  main.SeriesDTO:
+    properties:
+      host:
+        type: string
+      name:
+        type: string
+    type: object
 host: localhost:8080
 info:
   contact: {}
@@ -216,6 +223,40 @@ paths:
       security:
       - BearerAuth: []
       summary: Список метрик за период
+      tags:
+      - metrics
+  /series:
+    get:
+      parameters:
+      - description: показывать ряды, активные после этого момента, RFC3339 (по умолчанию
+          now-1h)
+        in: query
+        name: since
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/main.SeriesDTO'
+            type: array
+        "400":
+          description: неверные параметры
+          schema:
+            type: string
+        "401":
+          description: нет/невалидный токен
+          schema:
+            type: string
+        "500":
+          description: ошибка storage
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Список рядов (host + имя метрики) для пикеров
       tags:
       - metrics
 securityDefinitions:

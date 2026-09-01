@@ -278,6 +278,59 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/series": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "metrics"
+                ],
+                "summary": "Список рядов (host + имя метрики) для пикеров",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "показывать ряды, активные после этого момента, RFC3339 (по умолчанию now-1h)",
+                        "name": "since",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.SeriesDTO"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "неверные параметры",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "нет/невалидный токен",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "ошибка storage",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -341,6 +394,17 @@ const docTemplate = `{
                 },
                 "value": {
                     "type": "number"
+                }
+            }
+        },
+        "main.SeriesDTO": {
+            "type": "object",
+            "properties": {
+                "host": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
                 }
             }
         }

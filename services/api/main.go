@@ -132,6 +132,7 @@ func main() {
 	r.Group(func(r chi.Router) {
 		r.Use(authMiddleware([]byte(jwt)))
 		r.Get("/metrics", hApi.metricsHandler)
+		r.Get("/series", hApi.seriesHandler)
 		r.Get("/alerts", hApi.alertsHandler)
 		r.Get("/logs", hApi.logsHandler)
 	})

@@ -14,6 +14,7 @@ bin/
 /notifier
 /api
 /analyzer
+/tui
 
 # Тесты и покрытие
 *.test
@@ -40,3 +41,6 @@ k8s/secret.yaml
 
 # Личные заметки
 Vigil.md
+
+#dev
+debug.log

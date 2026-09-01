@@ -69,7 +69,8 @@
 | `vigil-processor` | —     | Consume из Kafka, батч → storage, агрегация (скользящие средние) |
 | `vigil-alerter`   | —     | Оценка правил, дедупликация + renotify, silence            |
 | `vigil-notifier`  | —     | Доставка алертов в Telegram (консьюмер alerts + retry)     |
-| `vigil-api`       | :8080 | REST Gateway (chi), JWT, /metrics, /logs, /alerts, swagger  |
+| `vigil-api`       | :8080 | REST Gateway (chi), JWT, /metrics, /series, /logs, /alerts, swagger |
+| `vigil-tui`       | —     | Терминальный дашборд (Bubble Tea): вкладки Alerts/Logs/Metrics, поллинг `vigil-api` |
 
 ---
 
@@ -86,9 +87,11 @@ vigil/
 │   ├── storage/            # gRPC + PostgreSQL (миграции, repository)
 │   │   ├── migrations/     # goose SQL-миграции
 │   │   └── repository/     # pgx: SaveBatch / List / EnsurePartitions
-│   └── logstorage/         # consume logs.raw → ClickHouse; gRPC чтение логов
-│       ├── migrations/     # goose (clickhouse-диалект)
-│       └── repository/     # clickhouse-go: SaveBatch (батч) / Query
+│   ├── logstorage/         # consume logs.raw → ClickHouse; gRPC чтение логов
+│   │   ├── migrations/     # goose (clickhouse-диалект)
+│   │   └── repository/     # clickhouse-go: SaveBatch (батч) / Query
+│   ├── api/                # REST Gateway (chi, JWT, swagger)
+│   └── tui/                # терминальный дашборд (Bubble Tea + lipgloss + bubbles)
 ├── pkg/
 │   ├── kafka/              # продюсер + consumer group (sarama) + trace-carrier
 │   ├── metrics/            # общий /metrics HTTP-сервер (Prometheus)
