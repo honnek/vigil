@@ -21,7 +21,7 @@ func (d *MinerDetector) Name() string {
 	return "miner"
 }
 func (d *MinerDetector) Applies(metricName string) bool {
-	return metricName == "cpu_usage_percent"
+	return metricName == "cpu_total_percent"
 }
 
 func (d *MinerDetector) Detect(points []Point) (confidence float64, matched bool) {

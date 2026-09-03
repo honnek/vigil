@@ -22,6 +22,11 @@ type consumerHandler struct {
 
 const batchSize = 500
 
+// flushInterval — верхняя граница задержки записи сырых метрик.
+// Без неё батч уходит только по заполнению, и задержка зависит от
+// частоты метрик: при 8 метриках/сек 500 штук копятся почти минуту.
+const flushInterval = 5 * time.Second
+
 var _ sarama.ConsumerGroupHandler = (*consumerHandler)(nil)
 
 func (h *consumerHandler) Setup(sess sarama.ConsumerGroupSession) error {
@@ -33,29 +38,50 @@ func (h *consumerHandler) Cleanup(sess sarama.ConsumerGroupSession) error {
 func (h *consumerHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	buf := make([]*pb.Metric, 0, batchSize)
 	bufMsgs := make([]*sarama.ConsumerMessage, 0, batchSize)
-	for msg := range claim.Messages() {
-		var m pb.Metric
-		consumedMessages.Inc()
 
-		ctx := otel.GetTextMapPropagator().Extract(sess.Context(), kafka.NewConsumerCarrier(msg))
-		tracer := otel.Tracer("vigil-processor")
-		ctx, span := tracer.Start(ctx, "process metric", trace.WithSpanKind(trace.SpanKindConsumer))
+	ticker := time.NewTicker(flushInterval)
+	defer ticker.Stop()
 
-		err := proto.Unmarshal(msg.Value, &m)
-		if err != nil {
-			log.Printf("Error unmarshaling message: %s\n", err)
-			errorsMessages.WithLabelValues("decode").Inc()
+	for {
+		select {
+		case msg, ok := <-claim.Messages():
+			if !ok {
+				return h.flush(sess, buf, bufMsgs)
+			}
+
+			var m pb.Metric
+			consumedMessages.Inc()
+
+			ctx := otel.GetTextMapPropagator().Extract(sess.Context(), kafka.NewConsumerCarrier(msg))
+			tracer := otel.Tracer("vigil-processor")
+			ctx, span := tracer.Start(ctx, "process metric", trace.WithSpanKind(trace.SpanKindConsumer))
+
+			err := proto.Unmarshal(msg.Value, &m)
+			if err != nil {
+				log.Printf("Error unmarshaling message: %s\n", err)
+				errorsMessages.WithLabelValues("decode").Inc()
+				span.End()
+				sess.MarkMessage(msg, "")
+				continue
+			}
+
+			buf = append(buf, &m)
+			bufMsgs = append(bufMsgs, msg)
+
+			h.agg.submit(&m)
+
+			if len(buf) >= batchSize {
+				if err := h.flush(sess, buf, bufMsgs); err != nil {
+					return err
+				}
+
+				bufMsgs = bufMsgs[:0]
+				buf = buf[:0]
+			}
+
 			span.End()
-			sess.MarkMessage(msg, "")
-			continue
-		}
 
-		buf = append(buf, &m)
-		bufMsgs = append(bufMsgs, msg)
-
-		h.agg.submit(&m)
-
-		if len(buf) >= batchSize {
+		case <-ticker.C:
 			if err := h.flush(sess, buf, bufMsgs); err != nil {
 				return err
 			}
@@ -63,15 +89,7 @@ func (h *consumerHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim s
 			bufMsgs = bufMsgs[:0]
 			buf = buf[:0]
 		}
-
-		span.End()
 	}
-
-	if err := h.flush(sess, buf, bufMsgs); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (h *consumerHandler) flush(sess sarama.ConsumerGroupSession, buf []*pb.Metric, bufMsgs []*sarama.ConsumerMessage) error {

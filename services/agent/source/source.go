@@ -20,6 +20,10 @@ type Source interface {
 }
 
 type CPUSource struct {
+	// PerCoreEvery — как часто отдавать метрики по отдельным ядрам.
+	// Нулевое значение означает «на каждый Collect».
+	PerCoreEvery time.Duration
+	lastPerCore  time.Time
 }
 
 type DiskIOSource struct {
@@ -29,9 +33,25 @@ type DiskIOSource struct {
 
 func (s *CPUSource) Collect() ([]*pb.Metric, error) {
 	var metrics []*pb.Metric
-	percentages, err := cpu.Percent(0, true)
+
+	total, err := cpu.Percent(0, false)
 	if err != nil {
 		return nil, err
+	}
+	if len(total) > 0 {
+		metrics = append(metrics, newMetric("cpu_total_percent", total[0], pb.MetricType_METRIC_TYPE_CPU))
+	}
+
+	now := time.Now()
+	if now.Sub(s.lastPerCore) < s.PerCoreEvery {
+		return metrics, nil
+	}
+	s.lastPerCore = now
+
+	percentages, err := cpu.Percent(0, true)
+	if err != nil {
+		log.Println(err)
+		return metrics, nil
 	}
 
 	for i, percentage := range percentages {

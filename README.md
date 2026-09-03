@@ -69,7 +69,7 @@
 | `vigil-processor` | —     | Consume из Kafka, батч → storage, агрегация (скользящие средние) |
 | `vigil-alerter`   | —     | Оценка правил, дедупликация + renotify, silence            |
 | `vigil-notifier`  | —     | Доставка алертов в Telegram (консьюмер alerts + retry)     |
-| `vigil-api`       | :8080 | REST Gateway (chi), JWT, /metrics, /series, /logs, /alerts, swagger |
+| `vigil-api`       | :8080 | REST Gateway (chi), JWT, /metrics, /series, /logs, /alerts, swagger; встроенная web-витрина (SPA) на `/` |
 | `vigil-tui`       | —     | Терминальный дашборд (Bubble Tea): вкладки Alerts/Logs/Metrics, поллинг `vigil-api` |
 
 ---

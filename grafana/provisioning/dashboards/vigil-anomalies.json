@@ -24,7 +24,7 @@
         "datasource": { "type": "postgres", "uid": "postgres" },
         "query": "SELECT DISTINCT name FROM metrics WHERE name NOT LIKE '%:avg' ORDER BY name",
         "refresh": 1,
-        "current": { "text": "cpu_usage_percent", "value": "cpu_usage_percent" }
+        "current": { "text": "cpu_total_percent", "value": "cpu_total_percent" }
       }
     ]
   },

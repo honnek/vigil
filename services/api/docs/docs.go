@@ -221,7 +221,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "имя метрики (напр. cpu_usage_percent)",
+                        "description": "имя метрики (напр. cpu_total_percent)",
                         "name": "name",
                         "in": "query",
                         "required": true

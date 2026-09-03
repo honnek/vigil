@@ -179,7 +179,7 @@ paths:
         name: host
         required: true
         type: string
-      - description: имя метрики (напр. cpu_usage_percent)
+      - description: имя метрики (напр. cpu_total_percent)
         in: query
         name: name
         required: true

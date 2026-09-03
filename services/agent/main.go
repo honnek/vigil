@@ -18,8 +18,13 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+// perCoreInterval — периодичность метрик по отдельным ядрам CPU.
+// Пороги и аномалии считаются по cpu_total_percent, ядра нужны лишь
+// для диагностики, поэтому шлём их реже общего тика.
+const perCoreInterval = 10 * time.Second
+
 var sources = []source.Source{
-	&source.CPUSource{},
+	&source.CPUSource{PerCoreEvery: perCoreInterval},
 	&source.RAMSource{},
 	&source.DiskSource{},
 	&source.DiskIOSource{},

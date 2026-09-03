@@ -57,7 +57,7 @@ type LogDTO struct {
 // @Tags     metrics
 // @Produce  json
 // @Param    host  query    string true  "хост"
-// @Param    name  query    string true  "имя метрики (напр. cpu_usage_percent)"
+// @Param    name  query    string true  "имя метрики (напр. cpu_total_percent)"
 // @Param    from  query    string true  "начало периода, RFC3339"
 // @Param    to    query    string true  "конец периода, RFC3339"
 // @Param    limit query    int    true  "макс. число точек"

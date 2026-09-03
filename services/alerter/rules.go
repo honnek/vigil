@@ -9,7 +9,7 @@ type Rule struct {
 }
 
 var rules = []Rule{
-	{Name: "high_cpu", Metric: "cpu_usage_percent", Threshold: 85},
+	{Name: "high_cpu", Metric: "cpu_total_percent", Threshold: 85},
 	{Name: "high_ram", Metric: "used_percent", Threshold: 90},
 	{Name: "high_disk", Metric: "disk_usage_percent", Threshold: 90},
 }
